@@ -3,5 +3,8 @@
   "workspaces": [
     "frontend"
   ],
+  "scripts": {
+    "frontend:dev": "yarn workspace @botfi/frontend dev"
+  },
   "packageManager": "yarn@4.9.1"
 }
