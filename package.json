@@ -1,4 +1,7 @@
 {
-  "name": "botfi",
+  "name": "@botfi/root",
+  "workspaces": [
+    "frontend"
+  ],
   "packageManager": "yarn@4.9.1"
 }
