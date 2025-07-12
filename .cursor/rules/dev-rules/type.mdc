@@ -1,0 +1,572 @@
+---
+alwaysApply: true
+---
+
+# TypeScript 型設計ガイドライン
+
+## 方針（必読）
+
+### 基本原則
+- **型は"境界ごと"に定義し、変換でつなぐ**
+- **DTO（外部/永続化境界） ⇄ Domain（アプリ内） ⇄ UI（プレゼン層）** の 3レイヤを明確化
+- 各レイヤは専用型を持ち、Mapper で変換（暗黙の共有禁止）
+
+### 技術スタック
+- **zod = ランタイム検証の単一ソース**
+  - 入出力の"入口/出口"で `zod.parse` / `safeParse`
+  - `z.infer` で型を自動派生（型とスキーマの二重管理を排除）
+
+### RSCシリアライズ可能性
+- **Date/BigInt/クラスは RSC では避け、ISO文字列/数値/Plain Object へ変換**
+- **金額/数量は小数誤差に注意：DecimalString を既定（UIで数値へ変換）**
+
+### エラーハンドリング
+- **Result 型でエラーを表現、throw は最小限**
+- 予測可能エラーは `Result<T,E>` を返却。UIは分岐表示
+- 予測不能エラーのみ throw（App Router の error.tsx へ）
+
+## 命名・配置規約
+
+### 命名規則
+- **型/エイリアス：PascalCase**（`User`, `ResourceDTO`）
+- **ID系：`<Entity>Id`**、金額/数量：`<Asset>Amount`、文字列表現は `...String`
+- **DTO/Domain/UI：`UserDTO` / `User` / `UserView`**
+- **Discriminant：`type: 'created' | 'updated'`** の文字列リテラル
+
+### ディレクトリ配置
+```
+types/                 # 共有型（小さなユーティリティ型やブランドなど）
+schemas/               # zod スキーマ（DTO/SA入出力）
+server/queries|mutations/  # DTO<->Domain 変換と取得/変更
+app/(segment)/_lib/    # 画面用の Domain->UI 変換（軽い Mapper）
+```
+
+## 基本原則
+
+### type vs interface
+- **union/ブランド/条件型：`type`**
+- **拡張されるPOJOの形や外部型の宣言合体：`interface`**
+- **迷ったら `type`**（合成・ユーティリティ適用に強い）
+
+### その他の原則
+- **読み取りは不変**
+  - `Readonly<T>` / `DeepReadonly<T>` を検討（UIで破壊的変更しない）
+- **文字列 enum 禁止**（ランタイム不要のため）
+  - 文字列リテラル union＋ `as const` 配列を使用
+- **any 禁止 / unknown から絞り込み**
+  - 外部入力は `unknown` → zodで絞る
+- **厳格 TS 設定**
+  - `strict: true`, `noImplicitAny: true`, `exactOptionalPropertyTypes: true`, `noUncheckedIndexedAccess: true`
+
+## パターン別サンプル
+
+### 1. ブランド型（ID・金額・アドレスなど）
+
+```typescript
+// types/brand.ts
+type Brand<T, B extends string> = T & { readonly __brand: B }
+
+// ID
+export type EntityId = Brand<string, 'EntityId'>
+
+// 金額（小数は文字列で扱う）
+export type DecimalString = Brand<string, 'DecimalString'>
+
+// XRPL Address
+export type Address = Brand<string, 'XRPLAddress'>
+```
+
+バリデータ（zod）でブランド化：
+
+```typescript
+// schemas/primitives.ts
+import { z } from 'zod'
+
+export const EntityIdSchema = z.string().min(1).transform((s) => s as import('@/types/brand').EntityId)
+export const DecimalStringSchema = z.string().regex(/^-?\d+(\.\d+)?$/).transform((s) => s as import('@/types/brand').DecimalString)
+export const AddressSchema = z.string().regex(/^r[1-9A-HJ-NP-Za-km-z]{25,34}$/).transform((s) => s as import('@/types/brand').Address)
+```
+
+### 2. DTO / Domain / UI の分離と Mapper
+
+```typescript
+// types/resource.ts
+import type { DecimalString, EntityId } from './brand'
+export type ResourceDTO = { id: string; amount: string }                  // API表現（生の文字列）
+export type Resource = { id: EntityId; amount: DecimalString }            // Domain（ブランド済み）
+export type ResourceView = { id: string; amountText: string }             // UI（表示用テキスト）
+```
+
+```typescript
+// server/queries/resource.mapper.ts
+import { z } from 'zod'
+import { EntityIdSchema, DecimalStringSchema } from '@/schemas/primitives'
+import type { ResourceDTO, Resource, ResourceView } from '@/types/resource'
+
+// DTO -> Domain（厳格）
+const ResourceDTOSchema = z.object({
+  id: EntityIdSchema,                 // ここでブランド化
+  amount: DecimalStringSchema,
+})
+export function toDomain(dto: unknown): Resource {
+  return ResourceDTOSchema.parse(dto)
+}
+
+// Domain -> UI（軽量変換）
+export function toView(d: Resource): ResourceView {
+  return { id: d.id, amountText: formatDecimal(d.amount) }
+}
+
+function formatDecimal(v: import('@/types/brand').DecimalString) {
+  // 表示整形（丸めやローカライズは UI 層の責務）
+  return v
+}
+```
+
+### 3. Result 型・エラー表現・網羅性チェック
+
+```typescript
+// types/result.ts
+export type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E }
+export const ok = <T>(v: T): Result<T> => ({ ok: true, value: v })
+export const err = <E>(e: E): Result<never, E> => ({ ok: false, error: e })
+
+export function assertNever(x: never): never { throw new Error(`Unexpected: ${x as unknown as string}`) }
+```
+
+```typescript
+// types/errors.ts
+export type ErrorCode =
+  | 'invalid_input'
+  | 'not_found'
+  | 'conflict'
+  | 'rate_limited'
+  | 'unauthorized'
+```
+
+### 4. Discriminated Union（イベント/状態）
+
+```typescript
+// types/events.ts
+export type ResourceEvent =
+  | { type: 'created'; id: string }
+  | { type: 'updated'; id: string; fields: ReadonlyArray<string> }
+  | { type: 'deleted'; id: string }
+
+export function handleEvent(e: ResourceEvent) {
+  switch (e.type) {
+    case 'created': /* ... */ break
+    case 'updated': /* ... */ break
+    case 'deleted': /* ... */ break
+    default: assertNever(e)
+  }
+}
+```
+
+### 5. ページング・共通コンテナ
+
+```typescript
+// types/common.ts
+export type PageCursor = string & { readonly __brand: 'PageCursor' }
+export type Page<T> = Readonly<{
+  items: ReadonlyArray<T>
+  next?: PageCursor            // ない場合は undefined（未定義）
+}>
+```
+
+### 6. Server Action 入力/出力（zod + Result）
+
+```typescript
+// schemas/resource.update.ts
+import { z } from 'zod'
+import { EntityIdSchema, DecimalStringSchema } from './primitives'
+
+export const UpdateResourceSchema = z.object({
+  id: EntityIdSchema,
+  amount: DecimalStringSchema,      // 文字列で受ける
+})
+export type UpdateResourceInput = z.infer<typeof UpdateResourceSchema>
+```
+
+```typescript
+// app/(seg)/_lib/actions.ts
+'use server'
+
+import { UpdateResourceSchema } from '@/schemas/resource.update'
+import { ok, err, type Result } from '@/types/result'
+
+export async function updateResource(_: unknown, form: FormData): Promise<Result<null, 'invalid_input' | 'conflict'>> {
+  const input = Object.fromEntries(form)
+  const parsed = UpdateResourceSchema.safeParse(input)
+  if (!parsed.success) return err('invalid_input')
+
+  // 変更ロジック...
+  // if (conflict) return err('conflict')
+  return ok(null)
+}
+```
+
+### 7. RSC に渡す型（シリアライズ安全）
+
+```typescript
+// types/rsc.ts
+// RSC を経由する props は Serializable に限定
+export type SerializablePrimitive = string | number | boolean | null
+export type Serializable = SerializablePrimitive | SerializablePrimitive[] | { [k: string]: Serializable }
+
+export type ResourceProps = Readonly<{
+  id: string
+  amountText: string
+}>
+```
+
+### 8. zustand の State 型（UI専用）
+
+```typescript
+// types/ui.ts
+export type PendingMap = Readonly<Record<string, boolean>>
+
+// stores/featureStore.ts では UI の補助状態のみを保持する想定
+```
+
+## 禁止事項（Anti-Patterns）
+
+| 禁止事項 | 代替案 |
+|----------|--------|
+| サーバ由来の権威データを UI/Store の型へ"そのまま"流用して可変化 | Domain は不変、UI は別型（View）で扱う |
+| Date/BigInt/クラスを RSC の props に含める | ISO 文字列/数値/Plain Object に変換してから渡す |
+| enum（TS列挙）の使用 | 文字列リテラル union（type）＋ `as const` 配列 |
+| any の使用・implicit any | unknown から zod で絞る。`noImplicitAny: true` を前提 |
+| 金額/数量を number で持ち回る（丸め誤差） | Domain では DecimalString。UIで必要なら Number() に変換して表示のみ |
+| 空文字での未入力表現 | 下記ルールに従い、空文字は UI 入力中限定。サーバ境界では undefined/null に正規化 |
+
+## 注意事項（ハマりがち）
+
+### exactOptionalPropertyTypes: true 前提
+- `foo?: T` は「存在しない or T | undefined」の2段階
+- 「"値がない"と"プロパティ自体がない"」を区別できる
+
+### 外部 JSON を"型アサーション"で通さない
+- 必ず zod で parse → DTO → Domain へ
+
+### ブランド型は文字列のまま
+- 比較/連結は可能だが、別ブランドとの混同を型で防ぐ（EntityId と Address は互換でない）
+
+### ユニオンの網羅性
+- `assertNever` で default 禁止（将来の拡張で型が先に壊れる＝安全）
+
+## 空文字 / undefined / null の使い分け（ベストプラクティス）
+
+| 文脈 | ベストプラクティス |
+|------|-------------------|
+| フォーム入力中（Client） | 空文字 `''` を許容（HTML入力の自然形）。Submit 前に正規化 |
+| 送信ペイロード/Server Action 入力 | 値が未指定ならプロパティ自体を省略（= undefined）。`exactOptionalPropertyTypes` を活かす |
+| DB/外部APIの"値なし" | そのシステムの表現に合わせるが、**ドメインでは null を「意図的に値がない」**として採用 |
+| RSC props | `undefined` は"プロパティが存在しない"、`null` は "値の欠如が意図された" を明示 |
+| 配列 | 「0件」は空配列 `[]`。`null` は使わない（区別必要なら `items?: T[]` で未取得を表現） |
+
+## 運用ルール
+
+1. **UI → SA：空文字は送信前に undefined or null に正規化**（zod で `.transform`）
+2. **Domain：意図的な欠如は null、未指定は undefined**（プロパティごと省略）
+3. **戻り値：Page<T> の next は「次がない」= undefined**（null は使わない）
+
+### 例：空文字を undefined に正規化
+
+```typescript
+// schemas/normalize.ts
+import { z } from 'zod'
+
+// 空文字を undefined にする補助
+export const optionalText = z
+  .string()
+  .transform((s) => (s.trim() === '' ? undefined : s))
+  .optional()
+```
+
+  .transform((s) => (s.trim() === '' ? undefined : s))
+  .optional()
+# TypeScript 型設計ガイドライン
+
+## 方針（必読）
+
+### 基本原則
+- **型は"境界ごと"に定義し、変換でつなぐ**
+- **DTO（外部/永続化境界） ⇄ Domain（アプリ内） ⇄ UI（プレゼン層）** の 3レイヤを明確化
+- 各レイヤは専用型を持ち、Mapper で変換（暗黙の共有禁止）
+
+### 技術スタック
+- **zod = ランタイム検証の単一ソース**
+  - 入出力の"入口/出口"で `zod.parse` / `safeParse`
+  - `z.infer` で型を自動派生（型とスキーマの二重管理を排除）
+
+### RSCシリアライズ可能性
+- **Date/BigInt/クラスは RSC では避け、ISO文字列/数値/Plain Object へ変換**
+- **金額/数量は小数誤差に注意：DecimalString を既定（UIで数値へ変換）**
+
+### エラーハンドリング
+- **Result 型でエラーを表現、throw は最小限**
+- 予測可能エラーは `Result<T,E>` を返却。UIは分岐表示
+- 予測不能エラーのみ throw（App Router の error.tsx へ）
+
+## 命名・配置規約
+
+### 命名規則
+- **型/エイリアス：PascalCase**（`User`, `ResourceDTO`）
+- **ID系：`<Entity>Id`**、金額/数量：`<Asset>Amount`、文字列表現は `...String`
+- **DTO/Domain/UI：`UserDTO` / `User` / `UserView`**
+- **Discriminant：`type: 'created' | 'updated'`** の文字列リテラル
+
+### ディレクトリ配置
+```
+types/                 # 共有型（小さなユーティリティ型やブランドなど）
+schemas/               # zod スキーマ（DTO/SA入出力）
+server/queries|mutations/  # DTO<->Domain 変換と取得/変更
+app/(segment)/_lib/    # 画面用の Domain->UI 変換（軽い Mapper）
+```
+
+## 基本原則
+
+### type vs interface
+- **union/ブランド/条件型：`type`**
+- **拡張されるPOJOの形や外部型の宣言合体：`interface`**
+- **迷ったら `type`**（合成・ユーティリティ適用に強い）
+
+### その他の原則
+- **読み取りは不変**
+  - `Readonly<T>` / `DeepReadonly<T>` を検討（UIで破壊的変更しない）
+- **文字列 enum 禁止**（ランタイム不要のため）
+  - 文字列リテラル union＋ `as const` 配列を使用
+- **any 禁止 / unknown から絞り込み**
+  - 外部入力は `unknown` → zodで絞る
+- **厳格 TS 設定**
+  - `strict: true`, `noImplicitAny: true`, `exactOptionalPropertyTypes: true`, `noUncheckedIndexedAccess: true`
+
+## パターン別サンプル
+
+### 1. ブランド型（ID・金額・アドレスなど）
+
+```typescript
+// types/brand.ts
+type Brand<T, B extends string> = T & { readonly __brand: B }
+
+// ID
+export type EntityId = Brand<string, 'EntityId'>
+
+// 金額（小数は文字列で扱う）
+export type DecimalString = Brand<string, 'DecimalString'>
+
+// XRPL Address
+export type Address = Brand<string, 'XRPLAddress'>
+```
+
+バリデータ（zod）でブランド化：
+
+```typescript
+// schemas/primitives.ts
+import { z } from 'zod'
+
+export const EntityIdSchema = z.string().min(1).transform((s) => s as import('@/types/brand').EntityId)
+export const DecimalStringSchema = z.string().regex(/^-?\d+(\.\d+)?$/).transform((s) => s as import('@/types/brand').DecimalString)
+export const AddressSchema = z.string().regex(/^r[1-9A-HJ-NP-Za-km-z]{25,34}$/).transform((s) => s as import('@/types/brand').Address)
+```
+
+### 2. DTO / Domain / UI の分離と Mapper
+
+```typescript
+// types/resource.ts
+import type { DecimalString, EntityId } from './brand'
+export type ResourceDTO = { id: string; amount: string }                  // API表現（生の文字列）
+export type Resource = { id: EntityId; amount: DecimalString }            // Domain（ブランド済み）
+export type ResourceView = { id: string; amountText: string }             // UI（表示用テキスト）
+```
+
+```typescript
+// server/queries/resource.mapper.ts
+import { z } from 'zod'
+import { EntityIdSchema, DecimalStringSchema } from '@/schemas/primitives'
+import type { ResourceDTO, Resource, ResourceView } from '@/types/resource'
+
+// DTO -> Domain（厳格）
+const ResourceDTOSchema = z.object({
+  id: EntityIdSchema,                 // ここでブランド化
+  amount: DecimalStringSchema,
+})
+export function toDomain(dto: unknown): Resource {
+  return ResourceDTOSchema.parse(dto)
+}
+
+// Domain -> UI（軽量変換）
+export function toView(d: Resource): ResourceView {
+  return { id: d.id, amountText: formatDecimal(d.amount) }
+}
+
+function formatDecimal(v: import('@/types/brand').DecimalString) {
+  // 表示整形（丸めやローカライズは UI 層の責務）
+  return v
+}
+```
+
+### 3. Result 型・エラー表現・網羅性チェック
+
+```typescript
+// types/result.ts
+export type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E }
+export const ok = <T>(v: T): Result<T> => ({ ok: true, value: v })
+export const err = <E>(e: E): Result<never, E> => ({ ok: false, error: e })
+
+export function assertNever(x: never): never { throw new Error(`Unexpected: ${x as unknown as string}`) }
+```
+
+```typescript
+// types/errors.ts
+export type ErrorCode =
+  | 'invalid_input'
+  | 'not_found'
+  | 'conflict'
+  | 'rate_limited'
+  | 'unauthorized'
+```
+
+### 4. Discriminated Union（イベント/状態）
+
+```typescript
+// types/events.ts
+export type ResourceEvent =
+  | { type: 'created'; id: string }
+  | { type: 'updated'; id: string; fields: ReadonlyArray<string> }
+  | { type: 'deleted'; id: string }
+
+export function handleEvent(e: ResourceEvent) {
+  switch (e.type) {
+    case 'created': /* ... */ break
+    case 'updated': /* ... */ break
+    case 'deleted': /* ... */ break
+    default: assertNever(e)
+  }
+}
+```
+
+### 5. ページング・共通コンテナ
+
+```typescript
+// types/common.ts
+export type PageCursor = string & { readonly __brand: 'PageCursor' }
+export type Page<T> = Readonly<{
+  items: ReadonlyArray<T>
+  next?: PageCursor            // ない場合は undefined（未定義）
+}>
+```
+
+### 6. Server Action 入力/出力（zod + Result）
+
+```typescript
+// schemas/resource.update.ts
+import { z } from 'zod'
+import { EntityIdSchema, DecimalStringSchema } from './primitives'
+
+export const UpdateResourceSchema = z.object({
+  id: EntityIdSchema,
+  amount: DecimalStringSchema,      // 文字列で受ける
+})
+export type UpdateResourceInput = z.infer<typeof UpdateResourceSchema>
+```
+
+```typescript
+// app/(seg)/_lib/actions.ts
+'use server'
+
+import { UpdateResourceSchema } from '@/schemas/resource.update'
+import { ok, err, type Result } from '@/types/result'
+
+export async function updateResource(_: unknown, form: FormData): Promise<Result<null, 'invalid_input' | 'conflict'>> {
+  const input = Object.fromEntries(form)
+  const parsed = UpdateResourceSchema.safeParse(input)
+  if (!parsed.success) return err('invalid_input')
+
+  // 変更ロジック...
+  // if (conflict) return err('conflict')
+  return ok(null)
+}
+```
+
+### 7. RSC に渡す型（シリアライズ安全）
+
+```typescript
+// types/rsc.ts
+// RSC を経由する props は Serializable に限定
+export type SerializablePrimitive = string | number | boolean | null
+export type Serializable = SerializablePrimitive | SerializablePrimitive[] | { [k: string]: Serializable }
+
+export type ResourceProps = Readonly<{
+  id: string
+  amountText: string
+}>
+```
+
+### 8. zustand の State 型（UI専用）
+
+```typescript
+// types/ui.ts
+export type PendingMap = Readonly<Record<string, boolean>>
+
+// stores/featureStore.ts では UI の補助状態のみを保持する想定
+```
+
+## 禁止事項（Anti-Patterns）
+
+| 禁止事項 | 代替案 |
+|----------|--------|
+| サーバ由来の権威データを UI/Store の型へ"そのまま"流用して可変化 | Domain は不変、UI は別型（View）で扱う |
+| Date/BigInt/クラスを RSC の props に含める | ISO 文字列/数値/Plain Object に変換してから渡す |
+| enum（TS列挙）の使用 | 文字列リテラル union（type）＋ `as const` 配列 |
+| any の使用・implicit any | unknown から zod で絞る。`noImplicitAny: true` を前提 |
+| 金額/数量を number で持ち回る（丸め誤差） | Domain では DecimalString。UIで必要なら Number() に変換して表示のみ |
+| 空文字での未入力表現 | 下記ルールに従い、空文字は UI 入力中限定。サーバ境界では undefined/null に正規化 |
+
+## 注意事項（ハマりがち）
+
+### exactOptionalPropertyTypes: true 前提
+- `foo?: T` は「存在しない or T | undefined」の2段階
+- 「"値がない"と"プロパティ自体がない"」を区別できる
+
+### 外部 JSON を"型アサーション"で通さない
+- 必ず zod で parse → DTO → Domain へ
+
+### ブランド型は文字列のまま
+- 比較/連結は可能だが、別ブランドとの混同を型で防ぐ（EntityId と Address は互換でない）
+
+### ユニオンの網羅性
+- `assertNever` で default 禁止（将来の拡張で型が先に壊れる＝安全）
+
+## 空文字 / undefined / null の使い分け（ベストプラクティス）
+
+| 文脈 | ベストプラクティス |
+|------|-------------------|
+| フォーム入力中（Client） | 空文字 `''` を許容（HTML入力の自然形）。Submit 前に正規化 |
+| 送信ペイロード/Server Action 入力 | 値が未指定ならプロパティ自体を省略（= undefined）。`exactOptionalPropertyTypes` を活かす |
+| DB/外部APIの"値なし" | そのシステムの表現に合わせるが、**ドメインでは null を「意図的に値がない」**として採用 |
+| RSC props | `undefined` は"プロパティが存在しない"、`null` は "値の欠如が意図された" を明示 |
+| 配列 | 「0件」は空配列 `[]`。`null` は使わない（区別必要なら `items?: T[]` で未取得を表現） |
+
+## 運用ルール
+
+1. **UI → SA：空文字は送信前に undefined or null に正規化**（zod で `.transform`）
+2. **Domain：意図的な欠如は null、未指定は undefined**（プロパティごと省略）
+3. **戻り値：Page<T> の next は「次がない」= undefined**（null は使わない）
+
+### 例：空文字を undefined に正規化
+
+```typescript
+// schemas/normalize.ts
+import { z } from 'zod'
+
+// 空文字を undefined にする補助
+export const optionalText = z
+  .string()
+  .transform((s) => (s.trim() === '' ? undefined : s))
+  .optional()
+```
+
+  .transform((s) => (s.trim() === '' ? undefined : s))
+  .optional()

@@ -1,4 +1,13 @@
 {
-  "name": "botfi",
+  "name": "@botfi/root",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "frontend:dev": "yarn workspace @botfi/frontend dev",
+    "frontend:build": "yarn workspace @botfi/frontend build",
+    "frontend:start": "yarn workspace @botfi/frontend start"
+  },
   "packageManager": "yarn@4.9.1"
 }
