@@ -20,7 +20,6 @@ import {
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
-  DropdownSection,
   DropdownItem
 } from "@heroui/dropdown";
 import { link as linkStyles } from "@heroui/theme";
@@ -32,13 +31,13 @@ import { ThemeSwitch } from "@/components/theme-switch";
 import {
   Logo,
 } from "@/components/icons";
+import { useWalletStore } from "@/stores";
 
 import { isInstalled, getAddress } from "@gemwallet/api"
 
 export const Navbar = () => {
   const {isOpen, onOpen, onOpenChange} = useDisclosure();
-
-  const [address, setAddress] = useState<string | null>(null);
+  const { isConnected, address, connect, disconnect } = useWalletStore();
 
   const handleConnect = async () => {
     try {
@@ -46,13 +45,13 @@ export const Navbar = () => {
         throw new Error("Gem wallet is not installed");
       }
 
-      const address = await getAddress();
+      const response = await getAddress();
 
-      if (!address || !address.result) {
+      if (!response || !response.result) {
         throw new Error("No address found");
       }
 
-      setAddress(address.result.address);
+      connect(response.result.address);
     } catch (error) {
       console.error(error);
     } finally {
@@ -61,7 +60,7 @@ export const Navbar = () => {
   }
 
   const handleDisconnect = () => {
-    setAddress(null);
+    disconnect();
   }
 
   return (
@@ -99,7 +98,7 @@ export const Navbar = () => {
           <ThemeSwitch />
         </NavbarItem>
         <NavbarItem>
-          {address ? (
+          {isConnected ? (
             <Dropdown>
               <DropdownTrigger>
               <Button>{address.slice(0, 6)}...{address.slice(-4)}</Button>
