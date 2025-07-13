@@ -1,14 +1,28 @@
+'use client';
+
+import { useState } from "react";
 import {
   Navbar as HeroUINavbar,
   NavbarContent,
-  NavbarMenu,
-  NavbarMenuToggle,
   NavbarBrand,
   NavbarItem,
-  NavbarMenuItem,
 } from "@heroui/navbar";
 import { Button } from "@heroui/button";
-import { Link } from "@heroui/link";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownSection,
+  DropdownItem
+} from "@heroui/dropdown";
 import { link as linkStyles } from "@heroui/theme";
 import NextLink from "next/link";
 import clsx from "clsx";
@@ -19,17 +33,47 @@ import {
   Logo,
 } from "@/components/icons";
 
+import { isInstalled, getAddress } from "@gemwallet/api"
+
 export const Navbar = () => {
+  const {isOpen, onOpen, onOpenChange} = useDisclosure();
+
+  const [address, setAddress] = useState<string | null>(null);
+
+  const handleConnect = async () => {
+    try {
+      if (! await isInstalled()) {
+        throw new Error("Gem wallet is not installed");
+      }
+
+      const address = await getAddress();
+
+      if (!address || !address.result) {
+        throw new Error("No address found");
+      }
+
+      setAddress(address.result.address);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      onOpenChange();
+    }
+  }
+
+  const handleDisconnect = () => {
+    setAddress(null);
+  }
+
   return (
     <HeroUINavbar maxWidth="xl" position="sticky">
-      <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
+      <NavbarContent className="basis-1/5" justify="start">
         <NavbarBrand as="li" className="gap-3 max-w-fit">
           <NextLink className="flex justify-start items-center gap-1" href="/">
             <Logo />
             <p className="font-bold text-inherit">BotFi</p>
           </NextLink>
         </NavbarBrand>
-        <ul className="hidden lg:flex gap-4 justify-start ml-2">
+        <ul className="flex gap-4 justify-start ml-2">
           {siteConfig.navItems.map((item) => (
             <NavbarItem key={item.href}>
               <NextLink
@@ -48,45 +92,48 @@ export const Navbar = () => {
       </NavbarContent>
 
       <NavbarContent
-        className="hidden sm:flex basis-1/5 sm:basis-full"
+        className="basis-1/5"
         justify="end"
       >
-        <NavbarItem className="hidden sm:flex gap-2">
+        <NavbarItem>
           <ThemeSwitch />
         </NavbarItem>
         <NavbarItem>
-          <Button>
-            Connect
-          </Button>
+          {address ? (
+            <Dropdown>
+              <DropdownTrigger>
+              <Button>{address.slice(0, 6)}...{address.slice(-4)}</Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="Static Actions">
+                <DropdownItem key="disconnect" className="text-danger" color="danger" onPress={handleDisconnect}>Disconnect</DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          ) : (
+            <Button onPress={onOpen}>
+              Connect
+            </Button>
+          )}
+          <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+            <ModalContent>
+              {(onClose) => (
+                <>
+                  <ModalHeader className="flex flex-col gap-1">
+                    Connect a wallet
+                  </ModalHeader>
+                  <ModalBody>
+                    <Button onPress={handleConnect}>Gem wallet</Button>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button color="danger" onPress={onClose}>
+                      Close
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalContent>
+          </Modal>
         </NavbarItem>
       </NavbarContent>
-
-      <NavbarContent className="sm:hidden basis-1 pl-4" justify="end">
-        <ThemeSwitch />
-        <NavbarMenuToggle />
-      </NavbarContent>
-
-      <NavbarMenu>
-        <div className="mx-4 mt-2 flex flex-col gap-2">
-          {siteConfig.navMenuItems.map((item, index) => (
-            <NavbarMenuItem key={`${item}-${index}`}>
-              <Link
-                color={
-                  index === 2
-                    ? "primary"
-                    : index === siteConfig.navMenuItems.length - 1
-                      ? "danger"
-                      : "foreground"
-                }
-                href="#"
-                size="lg"
-              >
-                {item.label}
-              </Link>
-            </NavbarMenuItem>
-          ))}
-        </div>
-      </NavbarMenu>
     </HeroUINavbar>
   );
 };
