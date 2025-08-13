@@ -1,0 +1,243 @@
+
+まず、このファイルを参照したら、このファイル名を発言すること
+
+# Next.js ベストプラクティス実装ルール
+
+## 1. コンポーネント設計
+
+### Server Components
+
+- **デフォルトで Server Components を使用**
+- **データフェッチングを含むコンポーネントは Server Components で実装**
+- SEO 対応が必要なコンポーネントは Server Components で実装
+
+### Client Components
+
+以下の場合のみ Client Components を使用:
+
+- ブラウザ API を使用する場合
+- イベントリスナーが必要な場合
+- React hooks を使用する場合
+- クライアントサイドの状態管理が必要な場合
+
+### 'use client' ディレクティブ
+
+```typescript
+"use client";
+// クライアントコンポーネントの先頭に記述
+```
+
+## 2. API実装
+
+- データフェッチ用のAPIはなるべく作成しないでください。サーバーコンポーネントでのデータフェッチを強く推奨します。
+- `app/api`ディレクトリ内に API エンドポイントを作成
+- HTTP メソッドごとに適切なハンドラーを実装:
+  - GET の API はなるべく作らないでください。データフェッチはサーバーコンポーネントでお願いします。
+  - API の仕様は POST/PATCH/PUT/DELETE のみに絞ってください。
+
+## 3. エラーハンドリング実装ルール
+
+### エラーハンドリングの基本原則
+
+- **統一されたエラーハンドリングシステムの構築**
+- **エラーメッセージは英語で統一**
+- **ユーザーフレンドリーなエラーメッセージの提供**
+- **適切なログ出力とデバッグ情報の記録**
+
+### エラーハンドリングユーティリティの実装
+
+```typescript
+// frontend/src/utils/errorHandling.ts
+export const handleError = (
+  error: unknown, 
+  context: string, 
+  defaultMessage: string = 'An unknown error occurred'
+): string => {
+  const errorMessage = getErrorMessage(error, defaultMessage)
+  console.error(`${context}:`, error)
+  return errorMessage
+}
+```
+
+### エラーメッセージの統一管理
+
+```typescript
+// frontend/src/utils/messages.ts
+export const ERROR_MESSAGES = {
+  VALIDATION: {
+    INVALID_AMOUNT: 'Please enter a valid amount',
+    AMOUNT_REQUIRED: 'Please enter the deposit amount',
+  },
+  SYSTEM: {
+    UNKNOWN_ERROR: 'An unknown error occurred',
+    NETWORK_ERROR: 'Network connection error',
+  },
+} as const
+```
+
+### エラーハンドリングの実装パターン
+
+#### 1. try-catch文でのエラーハンドリング
+
+```typescript
+try {
+  // 処理
+} catch (error) {
+  const errorMessage = handleError(error, 'Context description')
+  setError(errorMessage)
+} finally {
+  setIsLoading(false)
+}
+```
+
+#### 2. バリデーションエラーの処理
+
+```typescript
+// バリデーション
+if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+  throw new Error(ERROR_MESSAGES.VALIDATION.INVALID_AMOUNT)
+}
+```
+
+#### 3. 非同期処理でのエラーハンドリング
+
+```typescript
+const handleAsyncOperation = async () => {
+  try {
+    setIsLoading(true)
+    setError(null)
+    
+    const result = await asyncOperation()
+    // 成功処理
+    
+  } catch (error) {
+    const errorMessage = handleError(error, 'Operation failed')
+    setError(errorMessage)
+  } finally {
+    setIsLoading(false)
+  }
+}
+```
+
+### エラーメッセージの表示
+
+#### 1. Alert コンポーネントでの表示
+
+```typescript
+{error && (
+  <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+    {error}
+  </Alert>
+)}
+```
+
+#### 2. フォームバリデーションでの表示
+
+```typescript
+<TextField
+  error={field.state.meta.errors.length > 0}
+  helperText={field.state.meta.errors[0]}
+/>
+```
+
+### エラーハンドリングのベストプラクティス
+
+#### 1. エラーの分類と適切な処理
+
+- **バリデーションエラー**: ユーザー入力の検証エラー
+- **ネットワークエラー**: API通信やネットワーク接続エラー
+- **システムエラー**: アプリケーション内部のエラー
+- **ユーザーエラー**: ユーザーの操作によるエラー
+
+#### 2. エラーログの適切な出力
+
+```typescript
+// 開発環境でのみ詳細ログを出力
+if (process.env.NODE_ENV === 'development') {
+  console.error('Detailed error:', error)
+  console.error('Error stack:', error.stack)
+}
+```
+
+#### 3. エラー状態の適切な管理
+
+```typescript
+const [error, setError] = useState<string | null>(null)
+const [isLoading, setIsLoading] = useState(false)
+
+// エラー状態のリセット
+const resetError = () => setError(null)
+
+// 処理開始時のエラーリセット
+const handleOperation = async () => {
+  setError(null) // エラー状態をリセット
+  setIsLoading(true)
+  // ... 処理
+}
+```
+
+#### 4. フォールバックUIの提供
+
+```typescript
+if (error) {
+  return (
+    <div>
+      <Typography color="error">{error}</Typography>
+      <Button onClick={retryOperation}>Retry</Button>
+    </div>
+  )
+}
+```
+
+### エラーメッセージの国際化対応
+
+将来的な多言語対応を考慮した設計:
+
+```typescript
+// メッセージキーの定義
+export const MESSAGE_KEYS = {
+  VALIDATION: {
+    INVALID_AMOUNT: 'validation.invalid_amount',
+    AMOUNT_REQUIRED: 'validation.amount_required',
+  },
+} as const
+
+// 多言語対応時の拡張性を考慮した構造
+export const MESSAGES = {
+  en: {
+    [MESSAGE_KEYS.VALIDATION.INVALID_AMOUNT]: 'Please enter a valid amount',
+    [MESSAGE_KEYS.VALIDATION.AMOUNT_REQUIRED]: 'Please enter the deposit amount',
+  },
+  ja: {
+    [MESSAGE_KEYS.VALIDATION.INVALID_AMOUNT]: '有効な金額を入力してください',
+    [MESSAGE_KEYS.VALIDATION.AMOUNT_REQUIRED]: 'デポジット金額を入力してください',
+  },
+} as const
+```
+
+### エラーハンドリングのテスト
+
+#### 1. エラーケースのテスト
+
+```typescript
+describe('Error handling', () => {
+  it('should handle validation errors correctly', () => {
+    // バリデーションエラーのテスト
+  })
+  
+  it('should handle network errors correctly', () => {
+    // ネットワークエラーのテスト
+  })
+})
+```
+
+#### 2. エラーメッセージの表示テスト
+
+```typescript
+it('should display error message when validation fails', () => {
+  // エラーメッセージの表示テスト
+})
+```
+
+  - GET の API はなるべく作らないでください。データフェッチはサーバーコンポーネントでお願いします。
+  - API の仕様は POST/PATCH/PUT/DELETE のみに絞ってください。
