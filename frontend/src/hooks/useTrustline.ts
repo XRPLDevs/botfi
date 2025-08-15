@@ -1,27 +1,33 @@
-import { useQuery } from '@tanstack/react-query'
-import { useWalletStore } from '@/stores/wallet.store'
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import { useWallet } from '@/hooks/useWallet';
 
 export function useTrustline() {
-  const { isConnected, wallet } = useWalletStore()
+  const { account, isConnected } = useWallet();
 
   return useQuery({
-    queryKey: ['trustline', wallet.address, wallet.networkType],
-    queryFn: async ({ queryKey }: { queryKey: string[] }): Promise<boolean> => {
-      const address = queryKey[1]
-      const network = queryKey[2]
-      if (!address) throw new Error('Address is required')
+    queryKey: ['trustline', account?.address],
+    queryFn: async () => {
+      if (!isConnected || !account || !account.jwt) {
+        throw new Error('Wallet not connected');
+      }
 
-      const response = await fetch(`/api/trustline?address=${address}&networkType=${network}`, {
-        method: 'GET',
+      const jwt = account.jwt;
+
+      const response = await fetch('/api/trustlines', {
         headers: {
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jwt}`,
         },
-      })
-      const data = await response.json()
-      return data.isTrustline
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch trustlines');
+      }
+
+      const data = await response.json();
+      return data;
     },
-    enabled: isConnected && !!wallet.address,
-    retry: false, // 接続エラー時の再試行を無効化
-    staleTime: 5 * 60 * 1000, // 5分間キャッシュ
-  })
+    enabled: isConnected && !!account?.jwt,
+  });
 }

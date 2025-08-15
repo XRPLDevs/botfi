@@ -1,0 +1,616 @@
+---
+alwaysApply: true
+---
+
+# 方針（必読）
+
+1. RSCファースト
+  - 読み取り（表示用データ取得）は Server Components。
+  - 変更（副作用）は Server Actions / Route Handlers に隔離。
+2. Container / Presentational
+  - Container＝取得だけ（純粋・非同期OK）
+  - Presentational＝表示だけ（副作用なし・shadcn/ui で構築）
+3. Clientは最小限
+  - 署名・フォーム入力・SSE購読などブラウザ機能が必要な箇所のみ "use client".
+  - グローバル状態は最小（zustand）、サーバ状態はpropsで一方向伝播。
+4. 並行・段階描画
+  - <Suspense>で重い島だけ遅延。fallback は 固定サイズ Skeleton。
+  - PPR：ページは基本 Static、動的部分を Suspense 内に閉じ込める。
+5. 純粋性とメモ化
+  - 取得関数は純粋（Date.now()/Math.random()禁止）＋ cache()/unstable_cache()。
+  - **再検証はタグ（revalidateTag）**で制御。
+
+# ディレクトリ規約（機能単位コロケーション）
+
+```
+app/(segment)/
+  page.tsx / layout.tsx                # RSC。ルートの外殻
+  _containers/<feature>/
+    container.tsx                      # Server：取得のみ（純粋）
+    presentational.tsx                 # Shared：表示のみ（shadcn）
+    fallback.tsx                       # Skeleton（固定高）
+    client/<widget>.tsx                # Client：イベント/状態が必要な最小単位
+  _lib/
+    fetchers.ts                        # server-only：取得APIの入口（共通化）
+    actions.ts                         # Server Actions（副作用）
+    preload.ts                         # preloadパターン
+components/ui/*                        # shadcn/ui コンポーネント
+lib/{utils,cacheTags,env,...}.ts
+server/queries/*                       # 読み取り専用（cache/unstable_cache）
+server/mutations/*                     # 副作用（SA内部から呼ぶ）
+server/loaders/dataloaders.ts          # DataLoader（リクエスト単位に cache）
+schemas/*.ts                           # zod スキーマ
+stores/*.ts                            # "use client"（zustand）
+types/*.ts                             # 共有型
+
+```
+
+# 役割定義
+
+- Container（Server）
+  - 取得のみ。副作用禁止。Dynamic APIs（cookies() 等）を使う場合は Suspense内に配置。
+- Presentational（Shared）
+  - 受け取った props を描画するだけ。hooks最小、shadcn/ui と Tailwind で実装。
+- Client Widget（Client）
+  - Form/署名/モーダル等のインタラクティブ部分。**状態（zustand/局所state）**を扱う。
+- Fetcher（server-only）
+  - Request Memoization が効く形で URL/headers/init を統一。DB直叩きは cache()。
+- Server Action
+  - 変更系のみ。zodで検証 → Result型で返す → revalidateTag()。
+
+# パターン別 抽象サンプル
+
+> 以降は機能名やUIに依存しない抽象コードです。適宜名前を置き換えてください。
+
+1. Container / Presentational（基本）
+
+```
+// app/(segment)/_containers/resource/container.tsx  (Server)
+import { getResource } from '../../_lib/fetchers'
+import { ResourceView } from './presentational'
+
+export default async function ResourceContainer() {
+  const data = await getResource()            // 取得のみ・副作用なし
+  return <ResourceView data={data} />         // 表示に委譲
+}
+```
+
+```
+// app/(segment)/_containers/resource/presentational.tsx  (Shared)
+type Props = { data: { title: string; value: number } }
+export function ResourceView({ data }: Props) {
+  return (
+    <div className="rounded-2xl border p-4">
+      <div className="text-sm text-muted-foreground">{data.title}</div>
+      <div className="text-2xl">{data.value.toFixed(2)}</div>
+    </div>
+  )
+}
+```
+
+2. フェッチ層分離＋メモ化（Request Memoizationの温存）
+
+```
+// app/(segment)/_lib/fetchers.ts
+import 'server-only'
+import { unstable_cache } from 'next/cache'
+import { cache } from 'react'
+import { cacheTags } from '@/lib/cacheTags'
+
+// HTTP経由（URL/init統一）。実際は baseURL や headers をここで固定。
+async function _readResource() { return { title: 'Resource', value: 1.23 } }
+
+export const getResource = unstable_cache(_readResource, ['resource-read'], {
+  tags: [cacheTags.resource], revalidate: 10,
+})
+
+// DB直など fetch を使わない場合
+export const getOther = cache(async (id: string) => {
+  // ... DB/query
+  return { id }
+})
+```
+
+3. Suspense & PPR（重い島だけ遅延）
+
+```
+// app/(segment)/page.tsx  (Server)
+import { Suspense } from 'react'
+import ResourceContainer from './_containers/resource/container'
+import HeavyContainer from './_containers/heavy/container'
+import HeavyFallback from './_containers/heavy/fallback'
+
+export const experimental_ppr = true
+export const dynamic = 'force-static'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-5xl p-4">
+      <ResourceContainer />  {/* 軽い：即描画 */}
+      <Suspense fallback={<HeavyFallback />}>
+        <HeavyContainer />   {/* 重い：後から流れてくる */}
+      </Suspense>
+    </main>
+  )
+}
+```
+
+```
+// app/(segment)/_containers/heavy/fallback.tsx
+export default function HeavyFallback() {
+  return <div className="h-32 rounded-2xl border bg-muted animate-pulse" />  // ★固定高さ
+}
+```
+
+4. Composition（Clientを子に押し込める）
+
+```
+// app/(segment)/_containers/shell/presentational.tsx (Shared)
+export function Shell({ toolbar, children }: { toolbar: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">{toolbar}</div>
+      <div>{children}</div>
+    </section>
+  )
+}
+```
+
+```
+// app/(segment)/_containers/shell/container.tsx (Server)
+import { Shell } from './presentational'
+import { ClientToolbar } from '../client/client-toolbar'    // "use client"
+
+export default async function ShellContainer() {
+  return (
+    <Shell toolbar={<ClientToolbar />}>
+      {/* 子には他の Server Components を自由に配置 */}
+      <div className="rounded-2xl border p-4">Content</div>
+    </Shell>
+  )
+}
+```
+
+5.  preloadパターン（親子ウォーターフォール削減）
+
+```
+// app/(segment)/_lib/preload.ts
+import 'server-only'
+import { getResource } from './fetchers'
+export function preloadResource() { void getResource() }
+```
+
+```
+// app/(segment)/page.tsx
+import { preloadResource } from './_lib/preload'
+import { Child } from './_containers/child/container'
+export default function Page() {
+  preloadResource()               // ★ここで事前キック
+  return <Child />                // 子は await getResource() しても同一結果（Memo化）
+}
+```
+
+6. DataLoader（N+1抑止）
+
+```
+// server/loaders/dataloaders.ts
+import DataLoader from 'dataloader'
+import { cache } from 'react'
+
+// バッチ処理本体（ids -> records[] で順序合わせ）
+async function batchGet(ids: readonly string[]) {
+  const rows = await fetchBulk(ids as string[])
+  return ids.map((id) => rows.find((r) => r.id === id) ?? null)
+}
+
+export const getLoader = cache(() => new DataLoader(batchGet))
+```
+
+```
+// app/(segment)/_lib/fetchers.ts
+import 'server-only'
+import { getLoader } from '@/server/loaders/dataloaders'
+export async function getItem(id: string) {
+  return getLoader().load(id)
+}
+```
+
+7. Server Actions（副作用＋タグ再検証）
+
+```
+// app/(segment)/_lib/actions.ts
+'use server'
+
+import { z } from 'zod'
+import { revalidateTag } from 'next/cache'
+import { cacheTags } from '@/lib/cacheTags'
+
+const schema = z.object({ amount: z.number().positive() })
+
+export async function doMutate(_: unknown, formData: FormData) {
+  const parsed = schema.safeParse({ amount: Number(formData.get('amount')) })
+  if (!parsed.success) return { ok: false, error: 'invalid' }
+
+  // ... 変更操作（DB/XRPLなど）
+  revalidateTag(cacheTags.resource)
+  return { ok: true }                  // ★throw せず Result で返す
+}
+```
+
+```
+// app/(segment)/_containers/mutate/client/form.tsx
+'use client'
+import { useActionState } from 'react'
+import { doMutate } from '../../_lib/actions'
+
+export function MutateForm() {
+  const [state, action] = useActionState(doMutate, { ok: false })
+  return (
+    <form action={action} className="space-y-2">
+      <input name="amount" type="number" className="w-40 rounded border px-2 py-1" />
+      <button className="rounded bg-foreground px-3 py-1 text-background">Submit</button>
+      {!state.ok && state.error && <p className="text-sm text-red-600">{state.error}</p>}
+    </form>
+  )
+}
+```
+
+8. SSE購読（UIのみ・確定はrevalidate）
+
+```
+// hooks/useStream.ts (Client)
+'use client'
+import { useEffect } from 'react'
+export function useStream(onEvent: (e: MessageEvent) => void) {
+  useEffect(() => {
+    const es = new EventSource('/api/stream')
+    es.onmessage = onEvent
+    return () => es.close()
+  }, [onEvent])
+}
+```
+
+# 命名・props・スタイリング規約
+
+- ファイル名：container.tsx / presentational.tsx / fallback.tsx / client/<widget>.tsx
+- コンポーネント名：<Feature>Container / <Feature>View / <Feature>Fallback / <Widget>
+- Props：受け取るデータはシリアライズ可能な値（DateはISO文字列で）
+- スタイル：shadcn/ui＋Tailwind。クラス合成は cn() を使用。
+- Client Boundary："use client" は最小のファイルだけに付与。上位へ“にじまない”。
+
+# 禁止事項
+
+- Server Component での副作用（DB書き込み・Cookie set/delete・外部送信）
+- 取得関数の非決定性：Date.now() / Math.random() / locale 依存フォーマット
+- バラバラの fetch init（Memo化が効かない）
+- Dynamic APIs をルート直下で使用（headers()/cookies() → ルートが動的化）
+- 巨大な Client Boundary（上位で "use client"、広範囲がClient化）
+- Presentational からの外部 import 乱用（Privateに。必要なら eslint-plugin-import-access）
+- Skeleton の可変高さ（CLS悪化）
+- Server Action の throw 多用（予測可能エラーは Result で返す）
+
+# 注意事項（ハマりどころ）
+
+- Hydration mismatch 回避
+  - RSC出力は決定的に。乱数/時刻/ブラウザ情報を使わない。
+  - shadcnはランタイムCSSを注入しないため安全側だが、Clientでのみ表示が変わる要素は初期値を空描画で合わせる（例：Theme切替はマウントまでプレースホルダ）。
+- PPR & Dynamic APIs
+  - Dynamic API を使う Server Component は 必ず <Suspense> 内に入れる。
+- DataLoader のスコープ
+  - React.cache() でリクエスト単位にインスタンス化。グローバルに共有しない。
+
+# 実装チェックリスト（PR時）
+
+- 取得は server-only fetchers 経由、cache()/unstable_cache() でメモ化
+- Container は純粋（副作用なし）／Presentational は表示だけ
+- Clientは最小。"use client" の波及が最小範囲か
+- Suspense で重い島を遅延／Skeleton 固定高
+- Server Action は zod → Result → revalidateTag()
+- Dynamic APIs をルート直下で使っていない
+- Hydration の不一致要因なし（乱数/時刻/locale/ブラウザ依存表示）
+# 方針（必読）
+
+1. RSCファースト
+  - 読み取り（表示用データ取得）は Server Components。
+  - 変更（副作用）は Server Actions / Route Handlers に隔離。
+2. Container / Presentational
+  - Container＝取得だけ（純粋・非同期OK）
+  - Presentational＝表示だけ（副作用なし・shadcn/ui で構築）
+3. Clientは最小限
+  - 署名・フォーム入力・SSE購読などブラウザ機能が必要な箇所のみ "use client".
+  - グローバル状態は最小（zustand）、サーバ状態はpropsで一方向伝播。
+4. 並行・段階描画
+  - <Suspense>で重い島だけ遅延。fallback は 固定サイズ Skeleton。
+  - PPR：ページは基本 Static、動的部分を Suspense 内に閉じ込める。
+5. 純粋性とメモ化
+  - 取得関数は純粋（Date.now()/Math.random()禁止）＋ cache()/unstable_cache()。
+  - **再検証はタグ（revalidateTag）**で制御。
+
+# ディレクトリ規約（機能単位コロケーション）
+
+```
+app/(segment)/
+  page.tsx / layout.tsx                # RSC。ルートの外殻
+  _containers/<feature>/
+    container.tsx                      # Server：取得のみ（純粋）
+    presentational.tsx                 # Shared：表示のみ（shadcn）
+    fallback.tsx                       # Skeleton（固定高）
+    client/<widget>.tsx                # Client：イベント/状態が必要な最小単位
+  _lib/
+    fetchers.ts                        # server-only：取得APIの入口（共通化）
+    actions.ts                         # Server Actions（副作用）
+    preload.ts                         # preloadパターン
+components/ui/*                        # shadcn/ui コンポーネント
+lib/{utils,cacheTags,env,...}.ts
+server/queries/*                       # 読み取り専用（cache/unstable_cache）
+server/mutations/*                     # 副作用（SA内部から呼ぶ）
+server/loaders/dataloaders.ts          # DataLoader（リクエスト単位に cache）
+schemas/*.ts                           # zod スキーマ
+stores/*.ts                            # "use client"（zustand）
+types/*.ts                             # 共有型
+
+```
+
+# 役割定義
+
+- Container（Server）
+  - 取得のみ。副作用禁止。Dynamic APIs（cookies() 等）を使う場合は Suspense内に配置。
+- Presentational（Shared）
+  - 受け取った props を描画するだけ。hooks最小、shadcn/ui と Tailwind で実装。
+- Client Widget（Client）
+  - Form/署名/モーダル等のインタラクティブ部分。**状態（zustand/局所state）**を扱う。
+- Fetcher（server-only）
+  - Request Memoization が効く形で URL/headers/init を統一。DB直叩きは cache()。
+- Server Action
+  - 変更系のみ。zodで検証 → Result型で返す → revalidateTag()。
+
+# パターン別 抽象サンプル
+
+> 以降は機能名やUIに依存しない抽象コードです。適宜名前を置き換えてください。
+
+1. Container / Presentational（基本）
+
+```
+// app/(segment)/_containers/resource/container.tsx  (Server)
+import { getResource } from '../../_lib/fetchers'
+import { ResourceView } from './presentational'
+
+export default async function ResourceContainer() {
+  const data = await getResource()            // 取得のみ・副作用なし
+  return <ResourceView data={data} />         // 表示に委譲
+}
+```
+
+```
+// app/(segment)/_containers/resource/presentational.tsx  (Shared)
+type Props = { data: { title: string; value: number } }
+export function ResourceView({ data }: Props) {
+  return (
+    <div className="rounded-2xl border p-4">
+      <div className="text-sm text-muted-foreground">{data.title}</div>
+      <div className="text-2xl">{data.value.toFixed(2)}</div>
+    </div>
+  )
+}
+```
+
+2. フェッチ層分離＋メモ化（Request Memoizationの温存）
+
+```
+// app/(segment)/_lib/fetchers.ts
+import 'server-only'
+import { unstable_cache } from 'next/cache'
+import { cache } from 'react'
+import { cacheTags } from '@/lib/cacheTags'
+
+// HTTP経由（URL/init統一）。実際は baseURL や headers をここで固定。
+async function _readResource() { return { title: 'Resource', value: 1.23 } }
+
+export const getResource = unstable_cache(_readResource, ['resource-read'], {
+  tags: [cacheTags.resource], revalidate: 10,
+})
+
+// DB直など fetch を使わない場合
+export const getOther = cache(async (id: string) => {
+  // ... DB/query
+  return { id }
+})
+```
+
+3. Suspense & PPR（重い島だけ遅延）
+
+```
+// app/(segment)/page.tsx  (Server)
+import { Suspense } from 'react'
+import ResourceContainer from './_containers/resource/container'
+import HeavyContainer from './_containers/heavy/container'
+import HeavyFallback from './_containers/heavy/fallback'
+
+export const experimental_ppr = true
+export const dynamic = 'force-static'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-5xl p-4">
+      <ResourceContainer />  {/* 軽い：即描画 */}
+      <Suspense fallback={<HeavyFallback />}>
+        <HeavyContainer />   {/* 重い：後から流れてくる */}
+      </Suspense>
+    </main>
+  )
+}
+```
+
+```
+// app/(segment)/_containers/heavy/fallback.tsx
+export default function HeavyFallback() {
+  return <div className="h-32 rounded-2xl border bg-muted animate-pulse" />  // ★固定高さ
+}
+```
+
+4. Composition（Clientを子に押し込める）
+
+```
+// app/(segment)/_containers/shell/presentational.tsx (Shared)
+export function Shell({ toolbar, children }: { toolbar: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">{toolbar}</div>
+      <div>{children}</div>
+    </section>
+  )
+}
+```
+
+```
+// app/(segment)/_containers/shell/container.tsx (Server)
+import { Shell } from './presentational'
+import { ClientToolbar } from '../client/client-toolbar'    // "use client"
+
+export default async function ShellContainer() {
+  return (
+    <Shell toolbar={<ClientToolbar />}>
+      {/* 子には他の Server Components を自由に配置 */}
+      <div className="rounded-2xl border p-4">Content</div>
+    </Shell>
+  )
+}
+```
+
+5.  preloadパターン（親子ウォーターフォール削減）
+
+```
+// app/(segment)/_lib/preload.ts
+import 'server-only'
+import { getResource } from './fetchers'
+export function preloadResource() { void getResource() }
+```
+
+```
+// app/(segment)/page.tsx
+import { preloadResource } from './_lib/preload'
+import { Child } from './_containers/child/container'
+export default function Page() {
+  preloadResource()               // ★ここで事前キック
+  return <Child />                // 子は await getResource() しても同一結果（Memo化）
+}
+```
+
+6. DataLoader（N+1抑止）
+
+```
+// server/loaders/dataloaders.ts
+import DataLoader from 'dataloader'
+import { cache } from 'react'
+
+// バッチ処理本体（ids -> records[] で順序合わせ）
+async function batchGet(ids: readonly string[]) {
+  const rows = await fetchBulk(ids as string[])
+  return ids.map((id) => rows.find((r) => r.id === id) ?? null)
+}
+
+export const getLoader = cache(() => new DataLoader(batchGet))
+```
+
+```
+// app/(segment)/_lib/fetchers.ts
+import 'server-only'
+import { getLoader } from '@/server/loaders/dataloaders'
+export async function getItem(id: string) {
+  return getLoader().load(id)
+}
+```
+
+7. Server Actions（副作用＋タグ再検証）
+
+```
+// app/(segment)/_lib/actions.ts
+'use server'
+
+import { z } from 'zod'
+import { revalidateTag } from 'next/cache'
+import { cacheTags } from '@/lib/cacheTags'
+
+const schema = z.object({ amount: z.number().positive() })
+
+export async function doMutate(_: unknown, formData: FormData) {
+  const parsed = schema.safeParse({ amount: Number(formData.get('amount')) })
+  if (!parsed.success) return { ok: false, error: 'invalid' }
+
+  // ... 変更操作（DB/XRPLなど）
+  revalidateTag(cacheTags.resource)
+  return { ok: true }                  // ★throw せず Result で返す
+}
+```
+
+```
+// app/(segment)/_containers/mutate/client/form.tsx
+'use client'
+import { useActionState } from 'react'
+import { doMutate } from '../../_lib/actions'
+
+export function MutateForm() {
+  const [state, action] = useActionState(doMutate, { ok: false })
+  return (
+    <form action={action} className="space-y-2">
+      <input name="amount" type="number" className="w-40 rounded border px-2 py-1" />
+      <button className="rounded bg-foreground px-3 py-1 text-background">Submit</button>
+      {!state.ok && state.error && <p className="text-sm text-red-600">{state.error}</p>}
+    </form>
+  )
+}
+```
+
+8. SSE購読（UIのみ・確定はrevalidate）
+
+```
+// hooks/useStream.ts (Client)
+'use client'
+import { useEffect } from 'react'
+export function useStream(onEvent: (e: MessageEvent) => void) {
+  useEffect(() => {
+    const es = new EventSource('/api/stream')
+    es.onmessage = onEvent
+    return () => es.close()
+  }, [onEvent])
+}
+```
+
+# 命名・props・スタイリング規約
+
+- ファイル名：container.tsx / presentational.tsx / fallback.tsx / client/<widget>.tsx
+- コンポーネント名：<Feature>Container / <Feature>View / <Feature>Fallback / <Widget>
+- Props：受け取るデータはシリアライズ可能な値（DateはISO文字列で）
+- スタイル：shadcn/ui＋Tailwind。クラス合成は cn() を使用。
+- Client Boundary："use client" は最小のファイルだけに付与。上位へ“にじまない”。
+
+# 禁止事項
+
+- Server Component での副作用（DB書き込み・Cookie set/delete・外部送信）
+- 取得関数の非決定性：Date.now() / Math.random() / locale 依存フォーマット
+- バラバラの fetch init（Memo化が効かない）
+- Dynamic APIs をルート直下で使用（headers()/cookies() → ルートが動的化）
+- 巨大な Client Boundary（上位で "use client"、広範囲がClient化）
+- Presentational からの外部 import 乱用（Privateに。必要なら eslint-plugin-import-access）
+- Skeleton の可変高さ（CLS悪化）
+- Server Action の throw 多用（予測可能エラーは Result で返す）
+
+# 注意事項（ハマりどころ）
+
+- Hydration mismatch 回避
+  - RSC出力は決定的に。乱数/時刻/ブラウザ情報を使わない。
+  - shadcnはランタイムCSSを注入しないため安全側だが、Clientでのみ表示が変わる要素は初期値を空描画で合わせる（例：Theme切替はマウントまでプレースホルダ）。
+- PPR & Dynamic APIs
+  - Dynamic API を使う Server Component は 必ず <Suspense> 内に入れる。
+- DataLoader のスコープ
+  - React.cache() でリクエスト単位にインスタンス化。グローバルに共有しない。
+
+# 実装チェックリスト（PR時）
+
+- 取得は server-only fetchers 経由、cache()/unstable_cache() でメモ化
+- Container は純粋（副作用なし）／Presentational は表示だけ
+- Clientは最小。"use client" の波及が最小範囲か
+- Suspense で重い島を遅延／Skeleton 固定高
+- Server Action は zod → Result → revalidateTag()
+- Dynamic APIs をルート直下で使っていない
+- Hydration の不一致要因なし（乱数/時刻/locale/ブラウザ依存表示）
