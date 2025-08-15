@@ -2,13 +2,20 @@ import Image from 'next/image';
 
 import AssetTableContainer from '@/app/(app)/_containers/asset-table/container';
 import WalletConnectMessageContainer from '@/app/(app)/_containers/wallet-connect-message/container';
+import RefreshButtonContainer from '@/app/(app)/_containers/refresh-button/container';
 
 export default function Home() {
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         <WalletConnectMessageContainer>
-          <AssetTableContainer />
+          <div className="flex flex-col gap-4 w-full">
+            {/* Refreshボタンを上部に配置 */}
+            <div className="flex justify-end">
+              <RefreshButtonContainer />
+            </div>
+            <AssetTableContainer />
+          </div>
         </WalletConnectMessageContainer>
       </main>
 
@@ -37,7 +44,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image aria-hidden src="/globe.svg" alt="Globe icon" width={16} height={16} />
+          <Image aria-hidden src="/window.svg" alt="Window icon" width={16} height={16} />
           Go to nextjs.org →
         </a>
       </footer>

@@ -1,11 +1,13 @@
 'use client';
 
-import { ASSET_CONFIG } from '@/app/(app)/_lib/asset-config';
+import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableRow } from '@/components/ui/table';
 import { TrustlineChecker } from '../client/trustline-checker';
+import { DialogsContainer } from './dialogs/container';
 import { AssetTableHeader, AssetTableView } from './presentational';
-import type { TrustlineStatus } from './types';
+import type { TrustlineStatus, TrustlineStatusWithBalance, AssetInfo } from './types';
+import type { TokenName } from '@/lib/constants';
 
 // テーブルのローディング用Skeleton（Tableコンポーネントと同じ構造）
 function AssetTableSkeleton() {
@@ -13,16 +15,16 @@ function AssetTableSkeleton() {
     <Table>
       <AssetTableHeader />
       <TableBody>
-        {ASSET_CONFIG.map((asset) => (
+        {getPrimaryTokenConfigs().map((asset: { currency: TokenName; issuer: string }) => (
           <TableRow key={asset.currency}>
             <TableCell className="w-[100px]">
-              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                 <span className="text-xs font-bold">{asset.currency}</span>
               </div>
             </TableCell>
             <TableCell className="w-[200px]">
-              <p className="font-bold">{asset.currency}</p>
-              {asset.issuer && <p className="text-xs text-gray-500 break-all">{asset.issuer}</p>}
+              <p className="text-bold">{asset.currency}</p>
+              {asset.issuer && <p className="text-xs text-muted-foreground break-all">{asset.issuer}</p>}
             </TableCell>
             <TableCell className="w-[100px]">
               <Skeleton className="h-4 w-16" />
@@ -40,27 +42,35 @@ function AssetTableSkeleton() {
 export default function AssetTableContainer() {
   return (
     <TrustlineChecker>
-      {(trustlineStatus, isLoading, error) => {
+      {(trustlineStatus, trustlineStatusWithBalance, isLoading, error) => {
         // ローディング中またはデータが未取得の場合はSkeletonを表示
-        if (isLoading || !trustlineStatus) {
+        if (isLoading || !trustlineStatus || !trustlineStatusWithBalance) {
           return <AssetTableSkeleton />;
         }
 
-        const assets = ASSET_CONFIG.map((asset) => ({
-          id: asset.currency,
-          type: asset.currency as 'BOT' | 'PRO' | 'RLUSD',
-          issuer: asset.issuer,
-          balance: 0,
-          hasTrustline: trustlineStatus[asset.currency as keyof TrustlineStatus] || false,
-        }));
+        const assets = getPrimaryTokenConfigs().map((asset: { currency: TokenName; issuer: string }) => {
+          const trustlineInfo = trustlineStatusWithBalance[asset.currency];
+          return {
+            id: asset.currency,
+            type: asset.currency,
+            issuer: asset.issuer,
+            balance: trustlineInfo?.balance || 0,
+            hasTrustline: trustlineInfo?.hasTrustline || false,
+          };
+        });
 
         return (
-          <AssetTableView
-            assets={assets}
-            trustlineStatus={trustlineStatus}
-            isLoading={isLoading}
-            error={error}
-          />
+          <DialogsContainer>
+            {(openDialog) => (
+              <AssetTableView
+                assets={assets}
+                trustlineStatus={trustlineStatus}
+                isLoading={isLoading}
+                error={error}
+                onOpenDialog={openDialog}
+              />
+            )}
+          </DialogsContainer>
         );
       }}
     </TrustlineChecker>

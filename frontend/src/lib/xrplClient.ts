@@ -1,23 +1,8 @@
 import { type AccountLinesTrustline, Client } from 'xrpl';
+import { NETWORK_CONFIG } from './constants/networks';
 
-// ネットワーク設定
-export const NETWORK_CONFIG = {
-  mainnet: {
-    BOT_ISSUER: 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU',
-    RLUSD_ISSUER: 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV',
-    DEPOSIT_WALLET: 'rnjyMRQTM2eYJcrjm1hXdfaUY6vhjAk4pC',
-  },
-  testnet: {
-    BOT_ISSUER: 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU', // テストネット用のアドレスに変更
-    RLUSD_ISSUER: 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV', // テストネット用のアドレスに変更
-    DEPOSIT_WALLET: 'rnjyMRQTM2eYJcrjm1hXdfaUY6vhjAk4pC', // テストネット用のアドレスに変更
-  },
-  devnet: {
-    BOT_ISSUER: 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU', // デブネット用のアドレスに変更
-    RLUSD_ISSUER: 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV', // デブネット用のアドレスに変更
-    DEPOSIT_WALLET: 'rnjyMRQTM2eYJcrjm1hXdfaUY6vhjAk4pC', // デブネット用のアドレスに変更
-  },
-} as const;
+// 定数ファイルからネットワーク設定を取得（重複定義を削除）
+export { NETWORK_CONFIG };
 
 export class XRPLClient {
   private client: Client;

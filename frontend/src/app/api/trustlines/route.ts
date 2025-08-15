@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { AccountLinesTrustline } from 'xrpl';
 import { XummSdkJwt } from 'xumm-sdk';
-import { ASSET_CONFIG } from '@/app/(app)/_lib/asset-config';
+import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { XRPLClient } from '@/lib/xrplClient';
 import { decodeCurrencyCode, encodeCurrencyCode } from '@/utils/currency';
+import { cacheTags } from '@/lib/cacheTags';
 
 // レスポンス用の型定義
 type TrustlineResponse = {
@@ -48,7 +49,7 @@ export async function GET(request: Request, context: { params: Promise<{}> }) {
     }
 
     // 必須トークンを含むtrustlineStatusを作成
-    const trustlineStatus: TrustlineResponse[] = ASSET_CONFIG.map(({ currency, issuer }) => {
+    const trustlineStatus: TrustlineResponse[] = getPrimaryTokenConfigs().map(({ currency, issuer }) => {
       const key = `${currency}_${issuer}`;
       const existingLine = existingTrustlines.get(key);
 
@@ -66,7 +67,7 @@ export async function GET(request: Request, context: { params: Promise<{}> }) {
         // 既存のtrustlineがない、またはlimitが0の場合
         return {
           currency: encodeCurrencyCode(currency), // currency.ts内で制御される
-          displayCurrency: currency, // ASSET_CONFIGのASCII文字列
+          displayCurrency: currency, // getPrimaryTokenConfigsのASCII文字列
           issuer,
           balance: existingLine?.balance || '0',
           limit: existingLine?.limit || '0',
@@ -79,7 +80,7 @@ export async function GET(request: Request, context: { params: Promise<{}> }) {
     const otherTrustlines = accountLines
       .filter(
         (line) =>
-          !ASSET_CONFIG.some((required) => {
+          !getPrimaryTokenConfigs().some((required) => {
             const decodedCurrency = decodeCurrencyCode(line.currency);
             return required.currency === decodedCurrency && required.issuer === line.account;
           })
@@ -96,7 +97,11 @@ export async function GET(request: Request, context: { params: Promise<{}> }) {
     // 必須トークン + その他のトークンを結合
     const allTrustlines = [...trustlineStatus, ...otherTrustlines];
 
-    return NextResponse.json(allTrustlines);
+    // キャッシュタグをヘッダーに追加
+    const response = NextResponse.json(allTrustlines);
+    response.headers.set('Cache-Tag', cacheTags.trustline);
+    
+    return response;
   } catch (error) {
     console.error('Trustlines API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
