@@ -1,20 +1,27 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
-import { toast } from '@/components/ui/toaster'
-import type { AssetInfo } from '../types'
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from '@/components/ui/toaster';
+import type { AssetInfo } from '../types';
 
 type SetTrustlineDialogProps = {
-  isOpen: boolean
-  onClose: () => void
-  asset: AssetInfo | null
-  onTrustlineSet: (currency: string, issuer: string, limit: string) => Promise<void>
-  isLoading?: boolean
-}
+  isOpen: boolean;
+  onClose: () => void;
+  asset: AssetInfo | null;
+  onTrustlineSet: (currency: string, issuer: string, limit: string) => Promise<void>;
+  isLoading?: boolean;
+};
 
 export function SetTrustlineDialog({
   isOpen,
@@ -23,21 +30,23 @@ export function SetTrustlineDialog({
   onTrustlineSet,
   isLoading = false,
 }: SetTrustlineDialogProps) {
-  const [limit, setLimit] = useState('1000000000') // デフォルト値
+  const [limit, setLimit] = useState('1000000000'); // デフォルト値
 
-  if (!asset) return null
+  if (!asset) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
     try {
-      await onTrustlineSet(asset.type, asset.issuer || '', limit)
-      toast.success(`Trustline request created for ${asset.type}. Please sign the transaction in the new tab.`)
-      onClose()
+      await onTrustlineSet(asset.type, asset.issuer || '', limit);
+      toast.success(
+        `Trustline request created for ${asset.type}. Please sign the transaction in the new tab.`
+      );
+      onClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to set trustline')
+      toast.error(error instanceof Error ? error.message : 'Failed to set trustline');
     }
-  }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -48,28 +57,18 @@ export function SetTrustlineDialog({
             Set trustline for {asset.type} token. This will allow you to hold and trade this token.
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="currency">Currency</Label>
-            <Input
-              id="currency"
-              value={asset.type}
-              disabled
-              className="bg-muted"
-            />
+            <Input id="currency" value={asset.type} disabled className="bg-muted" />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="issuer">Issuer</Label>
-            <Input
-              id="issuer"
-              value={asset.issuer || ''}
-              disabled
-              className="bg-muted"
-            />
+            <Input id="issuer" value={asset.issuer || ''} disabled className="bg-muted" />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="limit">Limit Amount</Label>
             <Input
@@ -84,7 +83,7 @@ export function SetTrustlineDialog({
               Maximum amount you trust this issuer for
             </p>
           </div>
-          
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
@@ -96,5 +95,5 @@ export function SetTrustlineDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

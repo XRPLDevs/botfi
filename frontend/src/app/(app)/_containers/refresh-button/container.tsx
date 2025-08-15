@@ -1,19 +1,14 @@
-'use client'
+'use client';
 
-import { RefreshButtonView } from '@/app/(app)/_containers/refresh-button/presentational'
-import { useTrustline } from '@/hooks/useTrustline'
+import { RefreshButtonView } from '@/app/(app)/_containers/refresh-button/presentational';
+import { useTrustline } from '@/hooks/useTrustline';
 
 export default function RefreshButtonContainer() {
-  const { refetch, isFetching } = useTrustline()
+  const { refetch, isFetching } = useTrustline();
 
   const handleRefresh = async () => {
-    await refetch()
-  }
+    await refetch();
+  };
 
-  return (
-    <RefreshButtonView 
-      onRefresh={handleRefresh}
-      isLoading={isFetching}
-    />
-  )
+  return <RefreshButtonView onRefresh={handleRefresh} isLoading={isFetching} />;
 }

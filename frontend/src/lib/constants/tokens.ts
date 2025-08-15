@@ -6,7 +6,7 @@ export const TOKENS = {
 } as const;
 
 // トークン名の型定義
-export type TokenName = typeof TOKENS[keyof typeof TOKENS];
+export type TokenName = (typeof TOKENS)[keyof typeof TOKENS];
 
 // 発行者アドレスの定数
 export const ISSUERS = {
@@ -29,8 +29,8 @@ export const DESCRIPTIONS = {
   [TOKENS.RLUSD]: 'RLUSD',
 } as const;
 
-// 主要トークンの配列（Trustline設定対象）- bRLUSD、PRO、RLUSDを表示
-export const PRIMARY_TOKENS: readonly TokenName[] = [TOKENS.BRLUSD, TOKENS.PRO, TOKENS.RLUSD] as const;
+// 主要トークンの配列（Trustline設定対象）- bRLUSD、RLUSDを表示（PROは除外）
+export const PRIMARY_TOKENS: readonly TokenName[] = [TOKENS.BRLUSD, TOKENS.RLUSD] as const;
 
 // トークン設定の取得関数
 export function getTokenConfig(tokenName: TokenName) {
@@ -66,26 +66,17 @@ export function getTokenConfigSafe(tokenName: string) {
  * トークン名を変更する際のヘルパー関数
  * 新しいトークン名を設定し、関連する定数を自動更新
  */
-export function updateTokenName(
-  oldTokenKey: keyof typeof TOKENS,
-  newTokenName: string
-) {
+export function updateTokenName(oldTokenKey: keyof typeof TOKENS, newTokenName: string) {
   // この関数は開発時のみ使用し、本番環境では定数を直接編集
   console.warn(
     `Token name update: ${oldTokenKey} -> ${newTokenName}. ` +
-    'Please update the constants file directly for production use.'
+      'Please update the constants file directly for production use.'
   );
-  
+
   return {
     oldName: TOKENS[oldTokenKey],
     newName: newTokenName,
-    affectedConstants: [
-      'TOKENS',
-      'ISSUERS',
-      'DISPLAY_NAMES',
-      'DESCRIPTIONS',
-      'PRIMARY_TOKENS'
-    ]
+    affectedConstants: ['TOKENS', 'ISSUERS', 'DISPLAY_NAMES', 'DESCRIPTIONS', 'PRIMARY_TOKENS'],
   };
 }
 
@@ -115,12 +106,7 @@ export function isPrimaryToken(tokenName: TokenName): boolean {
  */
 export function validateTokenConfig(tokenName: TokenName): boolean {
   const config = getTokenConfig(tokenName);
-  return !!(
-    config.currency &&
-    config.issuer &&
-    config.displayName &&
-    config.description
-  );
+  return !!(config.currency && config.issuer && config.displayName && config.description);
 }
 
 /**
@@ -128,15 +114,15 @@ export function validateTokenConfig(tokenName: TokenName): boolean {
  */
 export function validateAllTokenConfigs(): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
-  Object.values(TOKENS).forEach(tokenName => {
+
+  Object.values(TOKENS).forEach((tokenName) => {
     if (!validateTokenConfig(tokenName)) {
       errors.push(`Invalid configuration for token: ${tokenName}`);
     }
   });
-  
+
   return {
     valid: errors.length === 0,
-    errors
+    errors,
   };
 }

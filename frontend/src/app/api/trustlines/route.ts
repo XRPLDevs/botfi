@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { AccountLinesTrustline } from 'xrpl';
 import { XummSdkJwt } from 'xumm-sdk';
+import { cacheTags } from '@/lib/cacheTags';
 import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { XRPLClient } from '@/lib/xrplClient';
 import { decodeCurrencyCode, encodeCurrencyCode } from '@/utils/currency';
-import { cacheTags } from '@/lib/cacheTags';
 
 // レスポンス用の型定義
 type TrustlineResponse = {
@@ -16,7 +16,7 @@ type TrustlineResponse = {
   isTrust: boolean;
 };
 
-export async function GET(request: Request, context: { params: Promise<{}> }) {
+export async function GET(request: Request, _context: { params: Promise<Record<string, never>> }) {
   try {
     const authHeader = request.headers.get('authorization');
 
@@ -49,32 +49,34 @@ export async function GET(request: Request, context: { params: Promise<{}> }) {
     }
 
     // 必須トークンを含むtrustlineStatusを作成
-    const trustlineStatus: TrustlineResponse[] = getPrimaryTokenConfigs().map(({ currency, issuer }) => {
-      const key = `${currency}_${issuer}`;
-      const existingLine = existingTrustlines.get(key);
+    const trustlineStatus: TrustlineResponse[] = getPrimaryTokenConfigs().map(
+      ({ currency, issuer }) => {
+        const key = `${currency}_${issuer}`;
+        const existingLine = existingTrustlines.get(key);
 
-      if (existingLine && existingLine.limit !== '0' && existingLine.limit !== '0.000000') {
-        // 既存のtrustlineがあり、limitが0でない場合
-        return {
-          currency: existingLine.currency, // 元の16進数
-          displayCurrency: decodeCurrencyCode(existingLine.currency), // currency.ts内で制御される
-          issuer: existingLine.account,
-          balance: existingLine.balance,
-          limit: existingLine.limit,
-          isTrust: true,
-        };
-      } else {
-        // 既存のtrustlineがない、またはlimitが0の場合
-        return {
-          currency: encodeCurrencyCode(currency), // currency.ts内で制御される
-          displayCurrency: currency, // getPrimaryTokenConfigsのASCII文字列
-          issuer,
-          balance: existingLine?.balance || '0',
-          limit: existingLine?.limit || '0',
-          isTrust: false,
-        };
+        if (existingLine && existingLine.limit !== '0' && existingLine.limit !== '0.000000') {
+          // 既存のtrustlineがあり、limitが0でない場合
+          return {
+            currency: existingLine.currency, // 元の16進数
+            displayCurrency: decodeCurrencyCode(existingLine.currency), // currency.ts内で制御される
+            issuer: existingLine.account,
+            balance: existingLine.balance,
+            limit: existingLine.limit,
+            isTrust: true,
+          };
+        } else {
+          // 既存のtrustlineがない、またはlimitが0の場合
+          return {
+            currency: encodeCurrencyCode(currency), // currency.ts内で制御される
+            displayCurrency: currency, // getPrimaryTokenConfigsのASCII文字列
+            issuer,
+            balance: existingLine?.balance || '0',
+            limit: existingLine?.limit || '0',
+            isTrust: false,
+          };
+        }
       }
-    });
+    );
 
     // その他のトークンも追加（オプション）
     const otherTrustlines = accountLines
@@ -100,7 +102,7 @@ export async function GET(request: Request, context: { params: Promise<{}> }) {
     // キャッシュタグをヘッダーに追加
     const response = NextResponse.json(allTrustlines);
     response.headers.set('Cache-Tag', cacheTags.trustline);
-    
+
     return response;
   } catch (error) {
     console.error('Trustlines API error:', error);

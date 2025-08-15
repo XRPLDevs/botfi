@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import type { AssetInfo, TrustlineStatus } from './types';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -9,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { AssetInfo, TrustlineStatus } from './types';
 
 // 共通のテーブルヘッダー
 export function AssetTableHeader() {
@@ -34,19 +34,19 @@ type AssetTableViewProps = {
 
 // アクション列の表示内容を決定する関数
 function getActionContent(
-  asset: AssetInfo, 
+  asset: AssetInfo,
   trustlineStatus: TrustlineStatus,
   onOpenDialog: (type: 'deposit' | 'withdraw' | 'setTrustline', asset: AssetInfo) => void
 ) {
   const { type, hasTrustline, balance } = asset;
-  
+
   // bRLUSD通貨の場合
   if (type === 'bRLUSD') {
     if (!hasTrustline) {
       return (
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           className="cursor-pointer"
           onClick={() => onOpenDialog('setTrustline', asset)}
         >
@@ -55,9 +55,9 @@ function getActionContent(
       );
     } else {
       return (
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           className="cursor-pointer"
           disabled={balance <= 0}
           onClick={() => onOpenDialog('withdraw', asset)}
@@ -67,14 +67,14 @@ function getActionContent(
       );
     }
   }
-  
+
   // PRO通貨の場合
   if (type === 'PRO') {
     if (!hasTrustline) {
       return (
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           className="cursor-pointer"
           onClick={() => onOpenDialog('setTrustline', asset)}
         >
@@ -83,9 +83,9 @@ function getActionContent(
       );
     } else {
       return (
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           className="cursor-pointer"
           disabled={balance <= 0}
           onClick={() => onOpenDialog('withdraw', asset)}
@@ -95,14 +95,14 @@ function getActionContent(
       );
     }
   }
-  
+
   // RLUSD通貨の場合
   if (type === 'RLUSD') {
     if (!hasTrustline) {
       return (
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           className="cursor-pointer"
           onClick={() => onOpenDialog('setTrustline', asset)}
         >
@@ -112,7 +112,7 @@ function getActionContent(
     } else {
       // bRLUSDのTrustline状態を確認
       const brlusdHasTrustline = trustlineStatus.bRLUSD || false;
-      
+
       if (!brlusdHasTrustline) {
         return (
           <div className="text-sm text-amber-600 dark:text-amber-400 text-center px-2 py-1">
@@ -121,9 +121,9 @@ function getActionContent(
         );
       } else {
         return (
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="cursor-pointer"
             disabled={balance <= 0}
             onClick={() => onOpenDialog('deposit', asset)}
@@ -134,13 +134,13 @@ function getActionContent(
       }
     }
   }
-  
+
   // その他の通貨の場合
   if (!hasTrustline) {
     return (
-      <Button 
-        variant="outline" 
-        size="sm" 
+      <Button
+        variant="outline"
+        size="sm"
         className="cursor-pointer"
         onClick={() => onOpenDialog('setTrustline', asset)}
       >
@@ -148,58 +148,52 @@ function getActionContent(
       </Button>
     );
   } else {
-    return (
-      <div className="text-sm text-muted-foreground text-center px-2 py-1">
-        Trustline Set
-      </div>
-    );
+    return <div className="text-sm text-muted-foreground text-center px-2 py-1">Trustline Set</div>;
   }
 }
 
-export const AssetTableView = memo(({ 
-  assets, 
-  trustlineStatus, 
-  isLoading, 
-  error, 
-  onOpenDialog 
-}: AssetTableViewProps) => {
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
+export const AssetTableView = memo(
+  ({ assets, trustlineStatus, isLoading, error, onOpenDialog }: AssetTableViewProps) => {
+    if (isLoading) {
+      return <div>Loading...</div>;
+    }
 
-  if (error) {
-    return <div className="text-destructive">Error: {error}</div>;
-  }
+    if (error) {
+      return <div className="text-destructive">Error: {error}</div>;
+    }
 
-  if (assets.length === 0) {
-    return <div className="text-muted-foreground">No assets found</div>;
-  }
+    if (assets.length === 0) {
+      return <div className="text-muted-foreground">No assets found</div>;
+    }
 
-  return (
-    <Table>
-      <AssetTableHeader />
-      <TableBody>
-        {assets.map((asset) => (
-          <TableRow key={asset.id}>
-            <TableCell className="w-[100px]">
-              {/* 暗号資産のアイコン画像 */}
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                <span className="text-xs font-bold">{asset.type}</span>
-              </div>
-            </TableCell>
-            <TableCell className="w-[200px]">
-              <p className="font-bold">{asset.type}</p>
-              {asset.issuer && <p className="text-xs text-muted-foreground break-all">{asset.issuer}</p>}
-            </TableCell>
-            <TableCell className="w-[100px]">{asset.balance}</TableCell>
-            <TableCell className="text-right w-[200px]">
-              {getActionContent(asset, trustlineStatus, onOpenDialog)}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-});
+    return (
+      <Table>
+        <AssetTableHeader />
+        <TableBody>
+          {assets.map((asset) => (
+            <TableRow key={asset.id}>
+              <TableCell className="w-[100px]">
+                {/* 暗号資産のアイコン画像 */}
+                <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold">{asset.type}</span>
+                </div>
+              </TableCell>
+              <TableCell className="w-[200px]">
+                <p className="font-bold">{asset.type}</p>
+                {asset.issuer && (
+                  <p className="text-xs text-muted-foreground break-all">{asset.issuer}</p>
+                )}
+              </TableCell>
+              <TableCell className="w-[100px]">{asset.balance}</TableCell>
+              <TableCell className="text-right w-[200px]">
+                {getActionContent(asset, trustlineStatus, onOpenDialog)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  }
+);
 
 AssetTableView.displayName = 'AssetTableView';

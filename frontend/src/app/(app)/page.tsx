@@ -1,8 +1,8 @@
 import Image from 'next/image';
 
 import AssetTableContainer from '@/app/(app)/_containers/asset-table/container';
-import WalletConnectMessageContainer from '@/app/(app)/_containers/wallet-connect-message/container';
 import RefreshButtonContainer from '@/app/(app)/_containers/refresh-button/container';
+import WalletConnectMessageContainer from '@/app/(app)/_containers/wallet-connect-message/container';
 
 export default function Home() {
   return (

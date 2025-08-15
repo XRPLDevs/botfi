@@ -1,13 +1,12 @@
 'use client';
 
-import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableRow } from '@/components/ui/table';
+import type { TokenName } from '@/lib/constants';
+import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { TrustlineChecker } from '../client/trustline-checker';
 import { DialogsContainer } from './dialogs/container';
 import { AssetTableHeader, AssetTableView } from './presentational';
-import type { TrustlineStatus, TrustlineStatusWithBalance, AssetInfo } from './types';
-import type { TokenName } from '@/lib/constants';
 
 // テーブルのローディング用Skeleton（Tableコンポーネントと同じ構造）
 function AssetTableSkeleton() {
@@ -24,7 +23,9 @@ function AssetTableSkeleton() {
             </TableCell>
             <TableCell className="w-[200px]">
               <p className="text-bold">{asset.currency}</p>
-              {asset.issuer && <p className="text-xs text-muted-foreground break-all">{asset.issuer}</p>}
+              {asset.issuer && (
+                <p className="text-xs text-muted-foreground break-all">{asset.issuer}</p>
+              )}
             </TableCell>
             <TableCell className="w-[100px]">
               <Skeleton className="h-4 w-16" />
@@ -48,16 +49,18 @@ export default function AssetTableContainer() {
           return <AssetTableSkeleton />;
         }
 
-        const assets = getPrimaryTokenConfigs().map((asset: { currency: TokenName; issuer: string }) => {
-          const trustlineInfo = trustlineStatusWithBalance[asset.currency];
-          return {
-            id: asset.currency,
-            type: asset.currency,
-            issuer: asset.issuer,
-            balance: trustlineInfo?.balance || 0,
-            hasTrustline: trustlineInfo?.hasTrustline || false,
-          };
-        });
+        const assets = getPrimaryTokenConfigs().map(
+          (asset: { currency: TokenName; issuer: string }) => {
+            const trustlineInfo = trustlineStatusWithBalance[asset.currency];
+            return {
+              id: asset.currency,
+              type: asset.currency,
+              issuer: asset.issuer,
+              balance: trustlineInfo?.balance || 0,
+              hasTrustline: trustlineInfo?.hasTrustline || false,
+            };
+          }
+        );
 
         return (
           <DialogsContainer>

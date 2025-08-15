@@ -7,13 +7,13 @@ export const NETWORKS = {
   devnet: 'devnet',
 } as const;
 
-export type NetworkType = typeof NETWORKS[keyof typeof NETWORKS];
+export type NetworkType = (typeof NETWORKS)[keyof typeof NETWORKS];
 
 // デポジットウォレットの定数
 export const DEPOSIT_WALLET = 'rnjyMRQTM2eYJcrjm1hXdfaUY6vhjAk4pC';
 
 // ネットワーク設定の取得関数
-export function getNetworkConfig(network: NetworkType) {
+export function getNetworkConfig(_network: NetworkType) {
   return {
     BRLUSD_ISSUER: ISSUERS.bRLUSD,
     RLUSD_ISSUER: ISSUERS.RLUSD,
@@ -43,11 +43,7 @@ export const NETWORK_URLS = {
 // ネットワーク設定の検証関数
 export function validateNetworkConfig(network: NetworkType): boolean {
   const config = getNetworkConfig(network);
-  return !!(
-    config.BRLUSD_ISSUER &&
-    config.RLUSD_ISSUER &&
-    config.DEPOSIT_WALLET
-  );
+  return !!(config.BRLUSD_ISSUER && config.RLUSD_ISSUER && config.DEPOSIT_WALLET);
 }
 
 // ネットワーク情報の取得

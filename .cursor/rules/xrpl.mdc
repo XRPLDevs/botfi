@@ -101,13 +101,198 @@ const sdk = new XummSdkJwt('API_KEY', 'JWT_TOKEN')
 - **OfferCancel**: オファーのキャンセル
 - **AccountSet**: アカウント設定の変更
 
+#### 6. JWTを設定してAPIを呼び出す方法
+
+##### フロントエンド（クライアント）での実装
+
+###### 1. ウォレットストアからのJWT取得
+```typescript
+import { useWalletStore } from '@/stores/wallet.store';
+
+export function useDeposit() {
+  const { account, isConnected } = useWalletStore();
+  
+  const handleDeposit = async () => {
+    if (!isConnected || !account?.jwt) {
+      throw new Error('Wallet not connected or JWT missing');
+    }
+    
+    // JWTトークンを使用してAPIを呼び出し
+    const response = await fetch('/api/deposit', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${account.jwt}`,
+      },
+      body: formData,
+    });
+    
+    return response.json();
+  };
+  
+  return { handleDeposit };
+}
+```
+
+###### 2. カスタムフックでのJWT認証
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { useWalletStore } from '@/stores/wallet.store';
+
+export function useDepositData() {
+  const { account, isConnected } = useWalletStore();
+
+  return useQuery({
+    queryKey: ['deposit', account?.address],
+    queryFn: async () => {
+      if (!isConnected || !account?.jwt) {
+        throw new Error('Wallet not connected');
+      }
+
+      const response = await fetch('/api/deposit', {
+        headers: {
+          'Authorization': `Bearer ${account.jwt}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch deposit data');
+      }
+
+      return response.json();
+    },
+    enabled: isConnected && !!account?.jwt,
+  });
+}
+```
+
+##### バックエンド（APIルート）での実装
+
+###### 1. JWT認証の実装パターン
+```typescript
+import { NextResponse } from 'next/server';
+import { XummSdkJwt } from 'xumm-sdk';
+
+export async function POST(request: Request) {
+  try {
+    // 1. AuthorizationヘッダーからJWTトークンを取得
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const jwt = authHeader.split(' ')[1];
+
+    // 2. XUMM SDKでJWTの有効性を検証
+    const xumm = new XummSdkJwt(jwt);
+    const appDetails = await xumm.ping();
+    const jwtData = appDetails.jwtData as { [key: string]: string };
+
+    if (!jwtData) {
+      return NextResponse.json({ error: 'Invalid JWT' }, { status: 401 });
+    }
+
+    // 3. ユーザー情報を取得
+    const userAddress = jwtData.sub;
+    const networkEndpoint = jwtData.network_endpoint;
+
+    // 4. XRPL操作を実行
+    // ... XRPL関連の処理
+
+    return NextResponse.json({ success: true });
+    
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+###### 2. エラーハンドリングの詳細化
+```typescript
+export async function POST(request: Request) {
+  try {
+    console.log('API: Starting request processing');
+    
+    // JWT認証
+    const authHeader = request.headers.get('authorization');
+    console.log('API: Authorization header present:', !!authHeader);
+
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('API: Missing or invalid authorization header');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const jwt = authHeader.split(' ')[1];
+    console.log('API: JWT token extracted, length:', jwt.length);
+
+    // XUMM SDK認証
+    const xumm = new XummSdkJwt(jwt);
+    console.log('API: Validating JWT with XUMM SDK');
+    
+    const appDetails = await xumm.ping();
+    const jwtData = appDetails.jwtData as { [key: string]: string };
+
+    if (!jwtData) {
+      console.error('API: Invalid JWT data from XUMM SDK');
+      return NextResponse.json({ error: 'Invalid JWT' }, { status: 401 });
+    }
+
+    console.log('API: JWT validation successful, user address:', jwtData.sub);
+    
+    // 以降の処理...
+    
+  } catch (error) {
+    console.error('API: Unexpected error occurred');
+    console.error('API: Error type:', error?.constructor?.name);
+    console.error('API: Error message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('API: Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+```
+
+##### 実装時の重要なポイント
+
+###### 1. セキュリティ
+- JWTトークンは必ず`Authorization: Bearer`ヘッダーで送信
+- FormDataやクエリパラメータでJWTを送信しない
+- サーバーサイドでJWTの有効性を必ず検証
+
+###### 2. エラーハンドリング
+- 認証エラー（401）とサーバーエラー（500）を適切に区別
+- クライアントに機密情報を露出させない
+- デバッグ用のログはサーバーサイドでのみ出力
+
+###### 3. パフォーマンス
+- JWTの検証結果を適切にキャッシュ
+- 不要なAPI呼び出しを避ける
+- 適切なローディング状態の管理
+
+###### 4. ユーザー体験
+- ウォレット未接続時の適切なガイダンス
+- 認証エラー時の分かりやすいメッセージ
+- 処理進行状況の可視化
+
 ### 禁止事項
 - フロントエンドでの直接的なXRPL API呼び出し
 - API認証情報のハードコーディング
 - セキュリティを考慮しない実装
+- JWTトークンをFormDataやクエリパラメータで送信
 
 ### 推奨事項
 - 適切なログ出力とモニタリング
 - レート制限の考慮
 - ユーザー体験を重視したUI/UX設計
+- JWT認証の適切な実装とセキュリティ対策
 

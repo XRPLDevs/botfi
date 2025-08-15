@@ -62,6 +62,21 @@ export type TrustlineSetResponse = {
   signUrl?: string; // 署名用URLを追加
 };
 
+// Deposit用のPaymentトランザクション処理の型定義
+export type DepositRequest = {
+  currency: string;
+  issuer: string;
+  amount: string;
+  destination: string; // Deposit専用アドレス
+};
+
+export type DepositResponse = {
+  ok: boolean;
+  error?: string;
+  txHash?: string;
+  signUrl?: string; // 署名用URLを追加
+};
+
 export type AssetTableViewProps = {
   assets: AssetInfo[];
   trustlineStatus: TrustlineStatus;

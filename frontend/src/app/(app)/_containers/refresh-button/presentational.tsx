@@ -1,11 +1,11 @@
-import { RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 type RefreshButtonViewProps = {
-  onRefresh: () => Promise<void>
-  isLoading: boolean
-}
+  onRefresh: () => Promise<void>;
+  isLoading: boolean;
+};
 
 export function RefreshButtonView({ onRefresh, isLoading }: RefreshButtonViewProps) {
   return (
@@ -17,12 +17,7 @@ export function RefreshButtonView({ onRefresh, isLoading }: RefreshButtonViewPro
       className="h-9 w-9 p-0"
       title="Refresh data"
     >
-      <RefreshCw 
-        className={cn(
-          "h-4 w-4",
-          isLoading && "animate-spin"
-        )} 
-      />
+      <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
     </Button>
-  )
+  );
 }
