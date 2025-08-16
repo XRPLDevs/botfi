@@ -5,6 +5,7 @@ import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { XRPLClient } from '@/lib/xrplClient';
 import { decodeCurrencyCode, encodeCurrencyCode } from '@/utils/currency';
 import { validateJwt, createErrorResponse, createSuccessResponse, ApiLogger } from '@/lib/api-utils';
+import { isTransactionSuccessful } from '@/lib/transaction-validation';
 
 // レスポンス用の型定義
 type TrustlineResponse = {

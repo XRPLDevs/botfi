@@ -1,21 +1,21 @@
 import { NETWORKS } from './networks';
 import { TOKENS } from './tokens';
-import { DEFAULTS, FEES, CONSTRAINTS } from './common';
+import { CONSTRAINTS } from './common';
 
 /**
- * 設定の整合性を検証する共通関数
+ * Common function to validate configuration integrity
  */
 export function validateConfiguration() {
   const errors: string[] = [];
 
-  // トークン設定の検証
+  // Token configuration validation
   Object.values(TOKENS).forEach((tokenName) => {
     if (!tokenName || tokenName.trim() === '') {
       errors.push(`Invalid token name: ${tokenName}`);
     }
   });
 
-  // ネットワーク設定の検証
+  // Network configuration validation
   Object.values(NETWORKS).forEach((network) => {
     if (!network || network.trim() === '') {
       errors.push(`Invalid network name: ${network}`);

@@ -41,14 +41,15 @@ function getClaimableAmount(asset: AssetInfo, claimStatus: ClaimStatus | null): 
   // Only display claimable amount for bRLUSD currency
   if (type === 'bRLUSD' && claimStatus?.bRLUSD) {
     const claimInfo = claimStatus.bRLUSD;
+    
     if (claimInfo.canClaim && parseFloat(claimInfo.claimableAmount) > 0) {
-              return (
-          <div className="text-sm">
-            <span className="font-medium">
-              {claimInfo.claimableAmount}
-            </span>
-          </div>
-        );
+      return (
+        <div className="text-sm">
+          <span className="font-medium">
+            {claimInfo.claimableAmount}
+          </span>
+        </div>
+      );
     }
   }
   
@@ -94,6 +95,7 @@ function getActionContent(
   switch (type) {
     case 'bRLUSD': {
       const canClaim = claimStatus?.bRLUSD?.canClaim || false;
+      
       return (
         <div className="flex gap-2 justify-end">
           {canClaim && createActionButton('Claim', () => onOpenDialog('claim', asset))}
@@ -102,9 +104,6 @@ function getActionContent(
         </div>
       );
     }
-
-    case 'PRO':
-      return createActionButton('Withdraw', () => onOpenDialog('withdraw', asset), balance <= 0);
 
     case 'RLUSD': {
       const brlusdHasTrustline = trustlineStatus.bRLUSD || false;

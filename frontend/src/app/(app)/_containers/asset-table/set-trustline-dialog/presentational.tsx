@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toaster';
+import { DEFAULT_TRUSTLINE_LIMIT } from '@/lib/constants';
 import type { AssetInfo } from '../types';
 
 type SetTrustlineDialogProps = {
@@ -30,7 +31,7 @@ export function SetTrustlineDialog({
   onTrustlineSet,
   isLoading = false,
 }: SetTrustlineDialogProps) {
-  const [limit, setLimit] = useState('1000000000'); // デフォルト値
+  const [limit, setLimit] = useState(DEFAULT_TRUSTLINE_LIMIT); // 定数から取得
 
   if (!asset) return null;
 
@@ -76,7 +77,7 @@ export function SetTrustlineDialog({
               type="text"
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
-              placeholder="1000000000"
+              placeholder={DEFAULT_TRUSTLINE_LIMIT}
               required
             />
             <p className="text-sm text-muted-foreground">

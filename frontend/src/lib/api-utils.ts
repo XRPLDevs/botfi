@@ -106,7 +106,7 @@ export class ApiLogger {
   }
 
   info(message: string, data?: any) {
-    console.log(`${this.apiName}: ${message}`, data || '');
+    // console.log removed for production
   }
 
   warn(message: string, data?: any) {
@@ -119,7 +119,7 @@ export class ApiLogger {
 
   debug(message: string, data?: any) {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`${this.apiName}: [DEBUG] ${message}`, data || '');
+      // console.log removed for production
     }
   }
 }
@@ -138,7 +138,7 @@ export async function parseFormData(request: Request, apiName: string) {
         : typeof value === 'string' ? value : 'File/Blob'
     ]);
     
-    console.log(`${apiName}: FormData parsed`, { entries: safeEntries });
+    // console.log removed for production
     
     return formData;
   } catch (error) {
