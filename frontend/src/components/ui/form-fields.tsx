@@ -52,9 +52,7 @@ export function AmountInput({
           </div>
         )}
       </div>
-      {helperText && (
-        <div className="text-xs text-muted-foreground">{helperText}</div>
-      )}
+      {helperText && <div className="text-xs text-muted-foreground">{helperText}</div>}
       {error && <div className="text-xs text-red-500">{error}</div>}
     </div>
   );
@@ -86,9 +84,7 @@ export function ConfirmationInfo({ items }: ConfirmationInfoProps) {
       {items.map((item, index) => (
         <div key={index} className="flex justify-between text-sm">
           <span>{item.label}:</span>
-          <span className={item.highlight ? 'font-semibold' : ''}>
-            {item.value}
-          </span>
+          <span className={item.highlight ? 'font-semibold' : ''}>{item.value}</span>
         </div>
       ))}
     </div>

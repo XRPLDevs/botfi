@@ -23,14 +23,7 @@ type WithdrawDialogProps = {
 };
 
 export const WithdrawDialog = memo(
-  ({
-    isOpen,
-    onClose,
-    asset,
-    input,
-    onInputChange,
-    isLoading = false,
-  }: WithdrawDialogProps) => {
+  ({ isOpen, onClose, asset, input, onInputChange, isLoading = false }: WithdrawDialogProps) => {
     if (!asset) return null;
 
     // 最大Withdraw可能額（現在の残高）

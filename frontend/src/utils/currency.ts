@@ -44,7 +44,7 @@ export function encodeCurrencyCode(asciiString: string) {
 export function encodeMemoType(memoType: string): string {
   // ASCII文字をバイト配列に変換
   const bytes = Array.from(memoType).map((ch: string) => ch.charCodeAt(0));
-  
+
   // バイト配列を16進数文字列に変換
   return bytes
     .map((b) => b.toString(16).padStart(2, '0'))

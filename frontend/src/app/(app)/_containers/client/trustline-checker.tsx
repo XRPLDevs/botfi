@@ -23,7 +23,11 @@ type TrustlineCheckerProps = {
 };
 
 export function TrustlineChecker({ children }: TrustlineCheckerProps) {
-  const { data: trustlineData, isLoading: trustlineLoading, error: trustlineError } = useTrustline();
+  const {
+    data: trustlineData,
+    isLoading: trustlineLoading,
+    error: trustlineError,
+  } = useTrustline();
   const { data: claimData, isLoading: claimLoading, error: claimError } = useClaimStatus();
 
   // APIレスポンスの配列データをTrustlineStatusオブジェクトに変換
@@ -32,7 +36,9 @@ export function TrustlineChecker({ children }: TrustlineCheckerProps) {
         const status: TrustlineStatus = {} as TrustlineStatus;
         // 各主要トークンのtrustline状態を設定
         PRIMARY_TOKENS.forEach((tokenName) => {
-          const trustline = trustlineData.find((t: TrustlineResponse) => t.displayCurrency === tokenName);
+          const trustline = trustlineData.find(
+            (t: TrustlineResponse) => t.displayCurrency === tokenName
+          );
           status[tokenName] = trustline?.isTrust || false;
         });
 
@@ -46,7 +52,9 @@ export function TrustlineChecker({ children }: TrustlineCheckerProps) {
         const status: TrustlineStatusWithBalance = {} as TrustlineStatusWithBalance;
         // 残高情報も含むTrustlineStatusWithBalanceを生成
         PRIMARY_TOKENS.forEach((tokenName) => {
-          const trustline = trustlineData.find((t: TrustlineResponse) => t.displayCurrency === tokenName);
+          const trustline = trustlineData.find(
+            (t: TrustlineResponse) => t.displayCurrency === tokenName
+          );
           status[tokenName] = {
             hasTrustline: trustline?.isTrust || false,
             balance: parseFloat(trustline?.balance || '0'),
@@ -76,6 +84,14 @@ export function TrustlineChecker({ children }: TrustlineCheckerProps) {
   const error = trustlineError || claimError;
 
   return (
-    <>{children(trustlineStatus, trustlineStatusWithBalance, claimStatus, isLoading, error?.message || null)}</>
+    <>
+      {children(
+        trustlineStatus,
+        trustlineStatusWithBalance,
+        claimStatus,
+        isLoading,
+        error?.message || null
+      )}
+    </>
   );
 }

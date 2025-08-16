@@ -20,7 +20,7 @@ export interface MemoValidationResult {
  * @returns MemoValidationResult
  */
 export function validateMemo(
-  memo: any, 
+  memo: any,
   expectedMemoType: string = ENCODED_MEMO_TYPE_ID,
   logger?: ApiLogger
 ): MemoValidationResult {
@@ -32,7 +32,7 @@ export function validateMemo(
       }
       return {
         isValid: false,
-        error: 'Memo object not found'
+        error: 'Memo object not found',
       };
     }
 
@@ -43,7 +43,7 @@ export function validateMemo(
         memoType: memo.MemoType,
         memoData: memo.MemoData,
         memoFormat: memo.MemoFormat,
-        expectedMemoType: expectedMemoType
+        expectedMemoType: expectedMemoType,
       });
     }
 
@@ -54,56 +54,56 @@ export function validateMemo(
       }
       return {
         isValid: false,
-        error: 'MemoType not found'
+        error: 'MemoType not found',
       };
     }
 
     // MemoTypeの検証（エンコードされた値と直接比較）
     let decodedMemoType: string;
     let isEncodedExpected: boolean;
-    
+
     try {
       decodedMemoType = decodeMemoType(memo.MemoType);
       if (logger) {
         logger.debug('MemoType decoded successfully:', {
           encoded: memo.MemoType,
-          decoded: decodedMemoType
+          decoded: decodedMemoType,
         });
       }
-      
+
       // 期待される値がエンコードされた値かどうかを判定
       isEncodedExpected = expectedMemoType === ENCODED_MEMO_TYPE_ID;
-      
+
       if (isEncodedExpected) {
         // エンコードされた値が期待される場合、直接比較
         if (memo.MemoType !== expectedMemoType) {
           if (logger) {
-            logger.debug('MemoType mismatch detected (encoded comparison):', { 
-              actual: memo.MemoType, 
+            logger.debug('MemoType mismatch detected (encoded comparison):', {
+              actual: memo.MemoType,
               expected: expectedMemoType,
-              decoded: decodedMemoType
+              decoded: decodedMemoType,
             });
           }
           return {
             isValid: false,
             memoType: decodedMemoType,
-            error: `MemoType mismatch: expected "${expectedMemoType}", got "${memo.MemoType}"`
+            error: `MemoType mismatch: expected "${expectedMemoType}", got "${memo.MemoType}"`,
           };
         }
       } else {
         // 文字列が期待される場合、デコード後の値と比較
         if (decodedMemoType !== expectedMemoType) {
           if (logger) {
-            logger.debug('MemoType mismatch detected (decoded comparison):', { 
-              actual: decodedMemoType, 
+            logger.debug('MemoType mismatch detected (decoded comparison):', {
+              actual: decodedMemoType,
               expected: expectedMemoType,
-              encoded: memo.MemoType
+              encoded: memo.MemoType,
             });
           }
           return {
             isValid: false,
             memoType: decodedMemoType,
-            error: `MemoType mismatch: expected "${expectedMemoType}", got "${decodedMemoType}"`
+            error: `MemoType mismatch: expected "${expectedMemoType}", got "${decodedMemoType}"`,
           };
         }
       }
@@ -111,12 +111,12 @@ export function validateMemo(
       if (logger) {
         logger.debug('MemoType decode failed:', {
           encoded: memo.MemoType,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
       return {
         isValid: false,
-        error: `Failed to decode MemoType: ${memo.MemoType}`
+        error: `Failed to decode MemoType: ${memo.MemoType}`,
       };
     }
 
@@ -128,7 +128,7 @@ export function validateMemo(
       return {
         isValid: false,
         memoType: decodedMemoType,
-        error: 'MemoData not found'
+        error: 'MemoData not found',
       };
     }
 
@@ -139,33 +139,33 @@ export function validateMemo(
       if (logger) {
         logger.debug('UUID decoded successfully:', {
           encoded: memo.MemoData,
-          decoded: uuid
+          decoded: uuid,
         });
       }
-      
+
       if (!isValidUuid(uuid)) {
         if (logger) {
           logger.debug('UUID validation failed: Invalid UUID format', {
-            uuid: uuid
+            uuid: uuid,
           });
         }
         return {
           isValid: false,
           memoType: decodedMemoType,
-          error: 'Invalid UUID format in MemoData'
+          error: 'Invalid UUID format in MemoData',
         };
       }
     } catch (error) {
       if (logger) {
         logger.debug('UUID decode failed:', {
           encoded: memo.MemoData,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
       return {
         isValid: false,
         memoType: decodedMemoType,
-        error: `Failed to decode UUID from MemoData: ${memo.MemoData}`
+        error: `Failed to decode UUID from MemoData: ${memo.MemoData}`,
       };
     }
 
@@ -174,26 +174,25 @@ export function validateMemo(
       logger.debug('Memo validation completed successfully:', {
         memoType: decodedMemoType,
         uuid: uuid,
-        expectedMemoType: expectedMemoType
+        expectedMemoType: expectedMemoType,
       });
     }
 
     return {
       isValid: true,
       uuid,
-      memoType: decodedMemoType
+      memoType: decodedMemoType,
     };
-
   } catch (error) {
     if (logger) {
       logger.debug('Unexpected error during memo validation:', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        memo: memo
+        memo: memo,
       });
     }
     return {
       isValid: false,
-      error: `Unexpected error during memo validation: ${error instanceof Error ? error.message : 'Unknown error'}`
+      error: `Unexpected error during memo validation: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
   }
 }
@@ -215,7 +214,7 @@ export function findTransactionByUuid(
   return transactions.find((tx: any) => {
     const txJson = tx.tx_json;
     const memo = txJson.Memos?.[0]?.Memo;
-    
+
     if (!memo) {
       return false;
     }
@@ -244,18 +243,18 @@ export function filterTransactionsByValidMemo(
   if (logger) {
     logger.debug('Filtering transactions by valid memo:', {
       totalTransactions: transactions.length,
-      expectedMemoType: expectedMemoType
+      expectedMemoType: expectedMemoType,
     });
   }
 
   const validTransactions = transactions.filter((tx: any) => {
     const txJson = tx.tx_json;
     const memo = txJson.Memos?.[0]?.Memo;
-    
+
     if (!memo) {
       if (logger) {
         logger.debug('Transaction skipped: No memo found', {
-          txHash: tx.hash
+          txHash: tx.hash,
         });
       }
       return false;
@@ -266,7 +265,7 @@ export function filterTransactionsByValidMemo(
       if (logger) {
         logger.debug('Transaction skipped: Invalid memo', {
           txHash: tx.hash,
-          error: validation.error
+          error: validation.error,
         });
       }
       return false;
@@ -276,7 +275,7 @@ export function filterTransactionsByValidMemo(
       logger.debug('Transaction included: Valid memo', {
         txHash: tx.hash,
         memoType: validation.memoType,
-        uuid: validation.uuid
+        uuid: validation.uuid,
       });
     }
     return true;
@@ -286,7 +285,7 @@ export function filterTransactionsByValidMemo(
     logger.debug('Memo filtering completed:', {
       totalTransactions: transactions.length,
       validTransactions: validTransactions.length,
-      expectedMemoType: expectedMemoType
+      expectedMemoType: expectedMemoType,
     });
   }
 

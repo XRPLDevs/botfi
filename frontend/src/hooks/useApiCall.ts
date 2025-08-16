@@ -29,13 +29,7 @@ export function useApiCall<T = any>(options: ApiCallOptions<T> = {}): ApiCallRes
   const [error, setError] = useState<string | null>(null);
   const { account, isConnected } = useWalletStore();
 
-  const {
-    onSuccess,
-    onError,
-    successMessage,
-    errorMessage,
-    showToast = true,
-  } = options;
+  const { onSuccess, onError, successMessage, errorMessage, showToast = true } = options;
 
   const execute = useCallback(
     async (endpoint: string, requestOptions: RequestInit = {}): Promise<T | null> => {
@@ -56,7 +50,7 @@ export function useApiCall<T = any>(options: ApiCallOptions<T> = {}): ApiCallRes
         const headers: Record<string, string> = {
           Authorization: `Bearer ${account.jwt}`,
         };
-        
+
         // requestOptions.headersがある場合は追加
         if (requestOptions.headers) {
           Object.entries(requestOptions.headers).forEach(([key, value]) => {
@@ -65,7 +59,7 @@ export function useApiCall<T = any>(options: ApiCallOptions<T> = {}): ApiCallRes
             }
           });
         }
-        
+
         // FormDataでない場合のみContent-Typeを設定
         if (!isFormData) {
           headers['Content-Type'] = 'application/json';
@@ -123,7 +117,9 @@ export function useApiCall<T = any>(options: ApiCallOptions<T> = {}): ApiCallRes
 /**
  * FormDataを使用したAPI呼び出し用のフック
  */
-export function useFormDataApiCall<T = any>(options: ApiCallOptions<T> = {}): Omit<ApiCallResult<T>, 'execute'> & {
+export function useFormDataApiCall<T = any>(
+  options: ApiCallOptions<T> = {}
+): Omit<ApiCallResult<T>, 'execute'> & {
   execute: (endpoint: string, formData: FormData) => Promise<T | null>;
 } {
   const baseHook = useApiCall<T>(options);

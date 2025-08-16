@@ -1,4 +1,11 @@
-import { TOKENS, ISSUERS, DEPOSIT_ADDRESS, DEPOSIT_WALLET, TRUSTLINE_LIMITS, DEFAULT_TRUSTLINE_LIMIT } from './tokens';
+import {
+  TOKENS,
+  ISSUERS,
+  DEPOSIT_ADDRESS,
+  DEPOSIT_WALLET,
+  TRUSTLINE_LIMITS,
+  DEFAULT_TRUSTLINE_LIMIT,
+} from './tokens';
 
 /**
  * Common constants and configuration values

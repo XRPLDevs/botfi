@@ -50,7 +50,8 @@ export const DepositDialog = memo(
     };
 
     const isProcessing = isLoading || isApiLoading;
-    const isConfirmDisabled = !input.amount || parseFloat(input.amount) <= 0 || parseFloat(input.amount) > maxDepositAmount;
+    const isConfirmDisabled =
+      !input.amount || parseFloat(input.amount) <= 0 || parseFloat(input.amount) > maxDepositAmount;
 
     return (
       <BaseDialog
@@ -71,11 +72,15 @@ export const DepositDialog = memo(
         {/* Constraint information display (specification requirement) */}
         <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
           <AlertTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertTitle className="text-amber-800 dark:text-amber-200">Deposit Constraints</AlertTitle>
+          <AlertTitle className="text-amber-800 dark:text-amber-200">
+            Deposit Constraints
+          </AlertTitle>
           <AlertDescription className="text-amber-700 dark:text-amber-300">
             <ul className="list-inside list-disc text-sm">
               <li>bRLUSD Trustline Limit: {brlusdTrustlineLimit.toLocaleString()}</li>
-              <li>{asset.type} Balance: {rlusdBalance.toLocaleString()}</li>
+              <li>
+                {asset.type} Balance: {rlusdBalance.toLocaleString()}
+              </li>
               <li>Maximum Deposit Amount: {maxDepositAmount.toLocaleString()}</li>
             </ul>
           </AlertDescription>

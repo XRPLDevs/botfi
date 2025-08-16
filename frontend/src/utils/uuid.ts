@@ -11,7 +11,7 @@
 export function encodeUuid(uuid: string): string {
   // UUIDからハイフンを除去
   const cleanUuid = uuid.replace(/-/g, '');
-  
+
   // 16進数文字列に変換
   return cleanUuid;
 }

@@ -4,7 +4,12 @@ import { cacheTags } from '@/lib/cacheTags';
 import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { XRPLClient } from '@/lib/xrplClient';
 import { decodeCurrencyCode, encodeCurrencyCode } from '@/utils/currency';
-import { validateJwt, createErrorResponse, createSuccessResponse, ApiLogger } from '@/lib/api-utils';
+import {
+  validateJwt,
+  createErrorResponse,
+  createSuccessResponse,
+  ApiLogger,
+} from '@/lib/api-utils';
 import { isTransactionSuccessful } from '@/lib/transaction-validation';
 
 // レスポンス用の型定義
@@ -19,7 +24,7 @@ type TrustlineResponse = {
 
 export async function GET(request: Request, _context: { params: Promise<Record<string, never>> }) {
   const logger = new ApiLogger('Trustlines API');
-  
+
   try {
     logger.info('Starting request processing');
 
@@ -102,11 +107,11 @@ export async function GET(request: Request, _context: { params: Promise<Record<s
 
     // 必須トークン + その他のトークンを結合
     const allTrustlines = [...trustlineStatus, ...otherTrustlines];
-    
+
     logger.info('Trustlines processed successfully', {
       primaryTokens: trustlineStatus.length,
       otherTokens: otherTrustlines.length,
-      total: allTrustlines.length
+      total: allTrustlines.length,
     });
 
     return createSuccessResponse(allTrustlines, cacheTags.trustline);

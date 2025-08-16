@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { depositAsset } from '@/app/(app)/_lib/actions';
-import { validateJwt, createErrorResponse, createSuccessResponse, ApiLogger, parseFormData } from '@/lib/api-utils';
+import {
+  validateJwt,
+  createErrorResponse,
+  createSuccessResponse,
+  ApiLogger,
+  parseFormData,
+} from '@/lib/api-utils';
 
 export async function POST(request: Request, _context: { params: Promise<Record<string, never>> }) {
   const logger = new ApiLogger('Deposit API');
-  
+
   try {
     logger.info('Starting request processing');
 
@@ -20,7 +26,7 @@ export async function POST(request: Request, _context: { params: Promise<Record<
 
     // FormData解析
     const formData = await parseFormData(request, 'Deposit API');
-    
+
     // JWTトークンをFormDataに追加（Server Actionで使用するため）
     formData.append('jwt', jwt);
     logger.debug('JWT token added to FormData');

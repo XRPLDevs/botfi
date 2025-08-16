@@ -2,17 +2,30 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { encodeUuid } from '@/utils/uuid';
 import { ENCODED_MEMO_TYPE_ID } from '@/utils/memo-validation';
-import { validateJwt, createErrorResponse, createSuccessResponse, ApiLogger, parseFormData } from '@/lib/api-utils';
+import {
+  validateJwt,
+  createErrorResponse,
+  createSuccessResponse,
+  ApiLogger,
+  parseFormData,
+} from '@/lib/api-utils';
 import { env } from '@/lib/env';
-import { validateTransactionIntegrity, isTransactionSuccessful } from '@/lib/transaction-validation';
+import {
+  validateTransactionIntegrity,
+  isTransactionSuccessful,
+} from '@/lib/transaction-validation';
 import { getBRLUSDConfig } from '@/lib/constants/tokens';
 
 // Claim用のスキーマ（簡素化）
 const ClaimSchema = z.object({
-  deposits: z.array(z.object({
-    uuid: z.string().min(1), // UUIDのみ必要
-    userAddress: z.string().min(1), // ユーザーのアドレス
-  })).min(1), // 最低1つのdepositが必要
+  deposits: z
+    .array(
+      z.object({
+        uuid: z.string().min(1), // UUIDのみ必要
+        userAddress: z.string().min(1), // ユーザーのアドレス
+      })
+    )
+    .min(1), // 最低1つのdepositが必要
 });
 
 // 連続実行防止用の処理中Claim管理
@@ -20,7 +33,7 @@ const processingClaims = new Set<string>();
 
 export async function POST(request: Request) {
   const logger = new ApiLogger('Claim API');
-  
+
   try {
     logger.info('Starting request processing');
 
@@ -37,17 +50,17 @@ export async function POST(request: Request) {
     // トークン設定の確認とログ出力
     const { getBRLUSDConfig } = await import('@/lib/constants/tokens');
     const brlusdConfig = getBRLUSDConfig();
-    
+
     logger.info('Token configuration loaded', {
       currency: brlusdConfig.currency,
       displayCurrency: brlusdConfig.displayCurrency,
       issuer: brlusdConfig.issuer,
-      displayName: brlusdConfig.displayName
+      displayName: brlusdConfig.displayName,
     });
 
     // FormData解析
     const formData = await parseFormData(request, 'Claim API');
-    
+
     // Debug: FormDataの内容をログ出力
     logger.debug('FormData contents:', {
       hasDeposits0Uuid: formData.has('deposits[0].uuid'),
@@ -55,20 +68,20 @@ export async function POST(request: Request) {
       deposits0Uuid: formData.get('deposits[0].uuid'),
       deposits0UserAddress: formData.get('deposits[0].userAddress'),
     });
-    
+
     // 複数depositの処理
     const deposits = [];
     let index = 0;
-    
+
     // FormDataから複数のdepositを抽出（新しいスキーマに合わせて修正）
     while (formData.has(`deposits[${index}].uuid`)) {
       const deposit = {
         uuid: formData.get(`deposits[${index}].uuid`) as string,
         userAddress: formData.get(`deposits[${index}].userAddress`) as string,
       };
-      
+
       deposits.push(deposit);
-      
+
       logger.debug(`Deposit ${index} extracted:`, deposit);
       index++;
     }
@@ -78,10 +91,10 @@ export async function POST(request: Request) {
     // スキーマ検証
     const parsed = ClaimSchema.safeParse({ deposits });
     if (!parsed.success) {
-      logger.warn('Schema validation failed', { 
+      logger.warn('Schema validation failed', {
         error: parsed.error.message,
         errorDetails: parsed.error.issues,
-        deposits: deposits
+        deposits: deposits,
       });
       return createErrorResponse('Claim API', null, 400, 'Invalid input data');
     }
@@ -89,54 +102,59 @@ export async function POST(request: Request) {
     logger.info('Schema validation successful', { depositCount: deposits.length });
 
     // 連続実行防止チェック
-    const claimKeys = deposits.map(d => `${d.uuid}-${d.userAddress}`);
-    const alreadyProcessing = claimKeys.some(key => processingClaims.has(key));
-    
+    const claimKeys = deposits.map((d) => `${d.uuid}-${d.userAddress}`);
+    const alreadyProcessing = claimKeys.some((key) => processingClaims.has(key));
+
     if (alreadyProcessing) {
       logger.warn('Claims already being processed', { uuids: claimKeys });
       return createErrorResponse('Claim API', null, 409, 'Claim is already being processed');
     }
 
     // 処理中マークを設定
-    claimKeys.forEach(key => processingClaims.add(key));
+    claimKeys.forEach((key) => processingClaims.add(key));
     logger.debug('Claims marked as processing', { uuids: claimKeys });
 
     // 重複チェックの詳細ログ
     logger.info('Starting duplicate check for deposits', {
       depositCount: deposits.length,
-      uuids: deposits.map(d => d.uuid),
-      userAddresses: deposits.map(d => d.userAddress),
+      uuids: deposits.map((d) => d.uuid),
+      userAddresses: deposits.map((d) => d.userAddress),
       expectedCurrency: brlusdConfig.currency,
-      expectedIssuer: brlusdConfig.issuer
+      expectedIssuer: brlusdConfig.issuer,
     });
 
     try {
       // 各depositの整合性チェックと情報取得
       logger.info('Starting claim validation for all deposits');
       const validatedDeposits = [];
-      
+
       // XRPLClientの初期化
       const { XRPLClient } = await import('@/lib/xrplClient');
       const xrplClient = new XRPLClient(env.XRPL_NODE_URL);
-      
+
       for (const deposit of deposits) {
         try {
-          const depositInfo = await validateTransactionIntegrity(deposit, address, logger, xrplClient);
+          const depositInfo = await validateTransactionIntegrity(
+            deposit,
+            address,
+            logger,
+            xrplClient
+          );
           validatedDeposits.push(depositInfo);
-          
+
           logger.info('Deposit validation successful', {
             uuid: deposit.uuid,
             currency: depositInfo.currency,
             issuer: depositInfo.issuer,
-            amount: depositInfo.amount
+            amount: depositInfo.amount,
           });
         } catch (error) {
           logger.error('Deposit validation failed', {
             uuid: deposit.uuid,
             error: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined
+            stack: error instanceof Error ? error.stack : undefined,
           });
-          
+
           // 具体的なエラーメッセージを生成
           let errorMessage = 'Deposit validation failed';
           if (error instanceof Error) {
@@ -150,21 +168,21 @@ export async function POST(request: Request) {
               errorMessage = error.message;
             }
           }
-          
+
           return createErrorResponse('Claim API', null, 400, errorMessage);
         }
       }
-      
+
       logger.info('All deposits validated and info extracted', { count: validatedDeposits.length });
 
       // XRPL WalletとClientの初期化
       const { Wallet, Client } = await import('xrpl');
       const issuerWallet = Wallet.fromSeed(env.ISSUER_WALLET_SEED);
       const client = new Client(env.XRPL_NODE_URL);
-      
-      logger.info('Processing claim transactions', { 
+
+      logger.info('Processing claim transactions', {
         issuerAddress: issuerWallet.address,
-        depositCount: validatedDeposits.length 
+        depositCount: validatedDeposits.length,
       });
 
       // XRPLクライアントに接続
@@ -192,13 +210,15 @@ export async function POST(request: Request) {
         // 各depositに対して個別のclaimトランザクションを実行
         for (let index = 0; index < validatedDeposits.length; index++) {
           const depositInfo = validatedDeposits[index];
-          
+
           try {
-            logger.info(`Processing deposit ${index + 1}/${validatedDeposits.length}`, { uuid: depositInfo.uuid });
+            logger.info(`Processing deposit ${index + 1}/${validatedDeposits.length}`, {
+              uuid: depositInfo.uuid,
+            });
 
             // bRLUSD設定を取得
             const brlusdConfig = getBRLUSDConfig();
-            
+
             // Deposit txから取得した情報を使用（bRLUSD設定で上書き）
             const transaction = {
               TransactionType: 'Payment' as const,
@@ -206,9 +226,9 @@ export async function POST(request: Request) {
               Account: issuerWallet.address,
               Destination: depositInfo.userAddress, // Deposit txの送信者アドレス
               Amount: {
-                currency: brlusdConfig.currency,    // ← 定数から取得（bRLUSD）
-                issuer: brlusdConfig.issuer,        // ← 定数から取得（bRLUSD issuer）
-                value: depositInfo.amount,          // Deposit txのamount
+                currency: brlusdConfig.currency, // ← 定数から取得（bRLUSD）
+                issuer: brlusdConfig.issuer, // ← 定数から取得（bRLUSD issuer）
+                value: depositInfo.amount, // Deposit txのamount
               },
               Memos: [
                 {
@@ -226,10 +246,10 @@ export async function POST(request: Request) {
                 ...transaction,
                 Amount: {
                   ...transaction.Amount,
-                  displayCurrency: brlusdConfig.displayCurrency,  // ← デコード済み通貨コード（画面表示用）
-                  encodedCurrency: transaction.Amount.currency,   // ← エンコード済み通貨コード（内部処理用）
-                }
-              }
+                  displayCurrency: brlusdConfig.displayCurrency, // ← デコード済み通貨コード（画面表示用）
+                  encodedCurrency: transaction.Amount.currency, // ← エンコード済み通貨コード（内部処理用）
+                },
+              },
             });
 
             // トランザクションの自動補完
@@ -243,14 +263,14 @@ export async function POST(request: Request) {
             // 署名済みトランザクションを送信
             logger.info('Submitting signed transaction to XRPL');
             const result = await client.submit(tx_blob);
-            
+
             if (isTransactionSuccessful(result.result.engine_result)) {
-              logger.info('Transaction submitted successfully', { 
-                hash, 
+              logger.info('Transaction submitted successfully', {
+                hash,
                 resultCode: result.result.engine_result,
-                ledgerIndex: result.result.validated_ledger_index
+                ledgerIndex: result.result.validated_ledger_index,
               });
-              
+
               results.push({
                 uuid: depositInfo.uuid,
                 success: true,
@@ -259,13 +279,13 @@ export async function POST(request: Request) {
                 ledgerIndex: result.result.validated_ledger_index,
               });
             } else {
-              logger.error('Transaction submission failed', { 
-                hash, 
+              logger.error('Transaction submission failed', {
+                hash,
                 result: result.result,
                 engineResult: result.result.engine_result,
-                engineResultMessage: result.result.engine_result_message
+                engineResultMessage: result.result.engine_result_message,
               });
-              
+
               // XRPLのエラーコードに基づいて適切なエラーメッセージを生成
               let errorMessage = 'Transaction submission failed';
               if (result.result.engine_result === 'tecPATH_DRY') {
@@ -275,20 +295,23 @@ export async function POST(request: Request) {
               } else if (result.result.engine_result === 'tecNO_LINE') {
                 errorMessage = 'No trustline exists';
               }
-              
+
               errors.push({
                 uuid: depositInfo.uuid,
                 success: false,
                 error: errorMessage,
-                result: result.result
+                result: result.result,
               });
             }
           } catch (error) {
-            logger.error(`Error processing deposit ${index + 1}`, { uuid: depositInfo.uuid, error });
+            logger.error(`Error processing deposit ${index + 1}`, {
+              uuid: depositInfo.uuid,
+              error,
+            });
             errors.push({
               uuid: depositInfo.uuid,
               success: false,
-              error: error instanceof Error ? error.message : 'Unknown error'
+              error: error instanceof Error ? error.message : 'Unknown error',
             });
           }
         }
@@ -301,16 +324,16 @@ export async function POST(request: Request) {
       // 結果の集計
       const successCount = results.length;
       const errorCount = errors.length;
-      
-      logger.info('All deposits processed', { 
-        total: deposits.length, 
-        success: successCount, 
-        errors: errorCount 
+
+      logger.info('All deposits processed', {
+        total: deposits.length,
+        success: successCount,
+        errors: errorCount,
       });
 
       // 処理完了後の3秒スリープ
       logger.info('Processing completed, waiting 3 seconds before response');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       logger.info('3 second wait completed, sending response');
 
       // レスポンスの生成
@@ -338,12 +361,12 @@ export async function POST(request: Request) {
             errorMessage = firstError.error;
           }
         }
-        
+
         return createErrorResponse('Claim API', null, 500, errorMessage);
       }
     } finally {
       // 処理完了後、処理中マークを削除
-      claimKeys.forEach(key => processingClaims.delete(key));
+      claimKeys.forEach((key) => processingClaims.delete(key));
       logger.debug('Claims processing completed', { uuids: claimKeys });
     }
   } catch (error) {

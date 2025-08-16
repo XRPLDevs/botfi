@@ -36,7 +36,12 @@ export const ClaimDialog = memo(
     // クールダウン期間の計算（5秒）
     const COOLDOWN_DURATION = 5000; // 5秒
     const isInCooldown = cooldownEnd && new Date() < cooldownEnd;
-    const isDisabled = isLoading || isProcessing || isInCooldown || !claimStatus.canClaim || parseFloat(claimStatus.claimableAmount) <= 0;
+    const isDisabled =
+      isLoading ||
+      isProcessing ||
+      isInCooldown ||
+      !claimStatus.canClaim ||
+      parseFloat(claimStatus.claimableAmount) <= 0;
 
     // 外側クリック時の動作を制御
     const handleOpenChange = (open: boolean) => {
@@ -70,15 +75,17 @@ export const ClaimDialog = memo(
       try {
         // FormDataを作成してServer Actionを呼び出し
         const formData = new FormData();
-        
+
         // Claim可能なdepositのみを対象にする
-        const claimableDeposits = claimStatus.depositHistory.filter(deposit => !deposit.isClaimed);
-        
+        const claimableDeposits = claimStatus.depositHistory.filter(
+          (deposit) => !deposit.isClaimed
+        );
+
         if (claimableDeposits.length === 0) {
           toast.error('Claim可能なdepositがありません');
           return;
         }
-        
+
         // UUIDとuserAddressのみを送信（他の情報はAPI側でXRPLから取得）
         claimableDeposits.forEach((deposit, index) => {
           formData.append(`deposits[${index}].uuid`, deposit.uuid);
@@ -96,21 +103,20 @@ export const ClaimDialog = memo(
 
         const result = await response.json();
 
-
         if (result.ok) {
           // 成功時の処理
           if (result.successfulClaims > 0) {
             toast.success(
               `Claim transactions completed successfully! ${result.successfulClaims}/${result.totalDeposits} transactions succeeded.`
             );
-            
+
             // クールダウン期間を設定
             const cooldownEndTime = new Date(Date.now() + COOLDOWN_DURATION);
             setCooldownEnd(cooldownEndTime);
-            
+
             // Claim完了後のデータ再取得
             queryClient.invalidateQueries({ queryKey: ['claim-status', account?.address] });
-            
+
             onClose();
           } else {
             toast.error('All claim transactions failed');
@@ -118,7 +124,7 @@ export const ClaimDialog = memo(
         } else {
           // エラーメッセージの詳細化
           let errorMessage = result.error || 'Failed to create claim transaction';
-          
+
           // 特定のエラーケースの処理
           if (result.error === 'Claim is already being processed') {
             errorMessage = 'Claimは既に処理中です。しばらくお待ちください。';
@@ -138,14 +144,16 @@ export const ClaimDialog = memo(
             errorMessage = 'Depositトランザクションの金額構造が不正です。';
           } else if (result.error === 'Invalid currency or issuer') {
             errorMessage = '通貨または発行者が不正です。';
-          } else if (result.error === 'Path could not send partial amount - insufficient liquidity') {
+          } else if (
+            result.error === 'Path could not send partial amount - insufficient liquidity'
+          ) {
             errorMessage = '送金経路が見つかりません。流動性が不足している可能性があります。';
           } else if (result.error === 'Insufficient funds for payment') {
             errorMessage = '支払いのための資金が不足しています。';
           } else if (result.error === 'No trustline exists') {
             errorMessage = 'トラストラインが存在しません。';
           }
-          
+
           toast.error(errorMessage);
         }
       } catch (_error) {
@@ -210,9 +218,15 @@ export const ClaimDialog = memo(
               <AlertTitle className="text-green-800 dark:text-green-200">Claim Status</AlertTitle>
               <AlertDescription className="text-green-700 dark:text-green-300">
                 <ul className="list-inside list-disc text-sm">
-                  <li>Claimable Amount: {claimStatus.claimableAmount} {asset.type}</li>
-                  <li>Total Deposited: {claimStatus.totalDeposited} {asset.type}</li>
-                  <li>Total Claimed: {claimStatus.totalClaimed} {asset.type}</li>
+                  <li>
+                    Claimable Amount: {claimStatus.claimableAmount} {asset.type}
+                  </li>
+                  <li>
+                    Total Deposited: {claimStatus.totalDeposited} {asset.type}
+                  </li>
+                  <li>
+                    Total Claimed: {claimStatus.totalClaimed} {asset.type}
+                  </li>
                 </ul>
               </AlertDescription>
             </Alert>
@@ -230,18 +244,28 @@ export const ClaimDialog = memo(
                     {claimStatus.depositHistory
                       .filter((deposit) => !deposit.isClaimed) // Claimableなdepositのみ表示
                       .map((deposit, index) => (
-                        <div key={index} className="border border-border rounded-lg p-3 bg-background">
+                        <div
+                          key={index}
+                          className="border border-border rounded-lg p-3 bg-background"
+                        >
                           <div className="grid grid-cols-1 gap-3 text-sm">
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-muted-foreground">UUID:</span>
-                                <span className="font-monospace text-xs break-words text-muted-foreground">{deposit.uuid}</span>
+                                <span className="font-monospace text-xs break-words text-muted-foreground">
+                                  {deposit.uuid}
+                                </span>
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-muted-foreground">Tx Hash:</span>
                                 <div className="flex items-center space-x-2">
-                                  <span className="font-monospace text-xs text-muted-foreground max-w-52 break-words" title={deposit.txHash}>
-                                    {deposit.txHash ? `${deposit.txHash.slice(0, 16)}...${deposit.txHash.slice(-16)}` : 'N/A'}
+                                  <span
+                                    className="font-monospace text-xs text-muted-foreground max-w-52 break-words"
+                                    title={deposit.txHash}
+                                  >
+                                    {deposit.txHash
+                                      ? `${deposit.txHash.slice(0, 16)}...${deposit.txHash.slice(-16)}`
+                                      : 'N/A'}
                                   </span>
                                   {deposit.txHash && (
                                     <button
@@ -263,16 +287,16 @@ export const ClaimDialog = memo(
                                 </div>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="font-medium text-muted-foreground">
-                                  Deposited
-                                </span>
+                                <span className="font-medium text-muted-foreground">Deposited</span>
                                 <span className="text-xs text-muted-foreground">
                                   {new Date(deposit.timestamp).toLocaleDateString()}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-muted-foreground">Amount:</span>
-                                <span className="font-semibold text-foreground">{deposit.amount} {asset.type}</span>
+                                <span className="font-semibold text-foreground">
+                                  {deposit.amount} {asset.type}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -321,10 +345,7 @@ export const ClaimDialog = memo(
             <Button variant="outline" onClick={onClose} disabled={isLoading || isProcessing}>
               キャンセル
             </Button>
-            <Button
-              onClick={handleClaim}
-              disabled={isDisabled}
-            >
+            <Button onClick={handleClaim} disabled={isDisabled}>
               {isProcessing ? '処理中...' : 'Claim実行'}
             </Button>
             {isInCooldown && (

@@ -32,7 +32,9 @@ function AssetTableSkeleton() {
               <TableCell className="w-[200px]">
                 <p className="text-bold">{tokenName}</p>
                 {config.issuer && (
-                  <p className="text-xs text-muted-foreground break-all">{formatAddress(config.issuer)}</p>
+                  <p className="text-xs text-muted-foreground break-all">
+                    {formatAddress(config.issuer)}
+                  </p>
                 )}
               </TableCell>
               <TableCell className="w-[100px]">

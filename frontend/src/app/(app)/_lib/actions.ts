@@ -5,8 +5,16 @@ import { XummSdkJwt } from 'xumm-sdk';
 import { z } from 'zod';
 import { encodeCurrencyCode } from '@/utils/currency';
 import { encodeUuid } from '@/utils/uuid';
-import { MEMO_TYPE_ID, ENCODED_MEMO_TYPE_ID, ENCODED_MEMO_FORMAT_TEXT_PLAIN } from '@/utils/memo-validation';
-import type { DepositResponse, TrustlineSetResponse, ClaimResponse } from '../_containers/asset-table/types';
+import {
+  MEMO_TYPE_ID,
+  ENCODED_MEMO_TYPE_ID,
+  ENCODED_MEMO_FORMAT_TEXT_PLAIN,
+} from '@/utils/memo-validation';
+import type {
+  DepositResponse,
+  TrustlineSetResponse,
+  ClaimResponse,
+} from '../_containers/asset-table/types';
 
 // 共通のスキーマ
 const CommonSchema = {
@@ -207,7 +215,7 @@ export async function claimAsset(_: unknown, formData: FormData): Promise<ClaimR
     if (!jwt) {
       return { ok: false, error: 'Authentication required' };
     }
-    
+
     // XUMM SDKでトランザクションを送信
     const xumm = new XummSdkJwt(jwt);
 

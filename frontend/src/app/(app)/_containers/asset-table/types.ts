@@ -133,7 +133,14 @@ export type ClaimResponse = BaseApiResponse & {
   failedClaims?: number;
   results?: ClaimResult[];
   errors?: ClaimResult[];
-  error?: 'Claim is already being processed' | 'Invalid input data' | 'Authentication required' | 'All claim transactions failed' | 'Transaction submission failed' | 'Internal server error' | string;
+  error?:
+    | 'Claim is already being processed'
+    | 'Invalid input data'
+    | 'Authentication required'
+    | 'All claim transactions failed'
+    | 'Transaction submission failed'
+    | 'Internal server error'
+    | string;
 };
 
 export type AssetTableViewProps = {
