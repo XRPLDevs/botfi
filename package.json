@@ -2,6 +2,7 @@
   "name": "@botfi/root",
   "private": true,
   "workspaces": [
+    "backend/app",
     "frontend"
   ],
   "scripts": {
