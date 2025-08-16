@@ -4,17 +4,19 @@ import { useCallback, useState } from 'react';
 import { DepositDialog } from '@/app/(app)/_containers/asset-table/deposit-dialog/presentational';
 import { SetTrustlineDialog } from '@/app/(app)/_containers/asset-table/set-trustline-dialog/presentational';
 import { WithdrawDialog } from '@/app/(app)/_containers/asset-table/withdraw-dialog/presentational';
+import { ClaimDialog } from '@/app/(app)/_containers/asset-table/claim-dialog/presentational';
 import { useWallet } from '@/hooks/useWallet';
 import { setTrustline } from '../../../_lib/actions';
-import type { AssetInfo, DialogState, TransactionInput } from '../types';
+import type { AssetInfo, DialogState, TransactionInput, ClaimStatus } from '../types';
 
 type DialogsContainerProps = {
   children: (
-    openDialog: (type: 'deposit' | 'withdraw' | 'setTrustline', asset: AssetInfo) => void
+    openDialog: (type: 'deposit' | 'withdraw' | 'setTrustline' | 'claim', asset: AssetInfo) => void
   ) => React.ReactNode;
+  claimStatus: ClaimStatus | null;
 };
 
-export function DialogsContainer({ children }: DialogsContainerProps) {
+export function DialogsContainer({ children, claimStatus }: DialogsContainerProps) {
   const [dialogState, setDialogState] = useState<DialogState>({
     isOpen: false,
     type: null,
@@ -31,7 +33,7 @@ export function DialogsContainer({ children }: DialogsContainerProps) {
 
   // ダイアログを開く
   const openDialog = useCallback(
-    (type: 'deposit' | 'withdraw' | 'setTrustline', asset: AssetInfo) => {
+    (type: 'deposit' | 'withdraw' | 'setTrustline' | 'claim', asset: AssetInfo) => {
       setDialogState({
         isOpen: true,
         type,
@@ -135,6 +137,17 @@ export function DialogsContainer({ children }: DialogsContainerProps) {
           onClose={closeDialog}
           asset={dialogState.asset}
           onTrustlineSet={handleTrustlineSet}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* Claimダイアログ */}
+      {dialogState.type === 'claim' && (
+        <ClaimDialog
+          isOpen={dialogState.isOpen}
+          onClose={closeDialog}
+          asset={dialogState.asset}
+          claimStatus={dialogState.asset ? claimStatus?.[dialogState.asset.type] || null : null}
           isLoading={isLoading}
         />
       )}

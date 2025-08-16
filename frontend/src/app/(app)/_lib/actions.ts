@@ -4,21 +4,33 @@ import { revalidateTag } from 'next/cache';
 import { XummSdkJwt } from 'xumm-sdk';
 import { z } from 'zod';
 import { encodeCurrencyCode } from '@/utils/currency';
-import type { DepositResponse, TrustlineSetResponse } from '../_containers/asset-table/types';
+import { encodeUuid } from '@/utils/uuid';
+import type { DepositResponse, TrustlineSetResponse, ClaimResponse } from '../_containers/asset-table/types';
 
-// トラストライン設定用のスキーマ
-const TrustlineSetSchema = z.object({
-  currency: z.string().min(1),
-  issuer: z.string().min(1),
-  limit: z.string().regex(/^\d+(\.\d+)?$/),
-});
-
-// Deposit用のPaymentトランザクション処理用のスキーマ
-const DepositSchema = z.object({
+// 共通のスキーマ
+const CommonSchema = {
   currency: z.string().min(1),
   issuer: z.string().min(1),
   amount: z.string().regex(/^\d+(\.\d+)?$/),
   destination: z.string().min(1),
+  limit: z.string().regex(/^\d+(\.\d+)?$/),
+  uuid: z.string().min(1),
+  userAddress: z.string().min(1),
+} as const;
+
+// トラストライン設定用のスキーマ
+const TrustlineSetSchema = z.object({
+  currency: CommonSchema.currency,
+  issuer: CommonSchema.issuer,
+  limit: CommonSchema.limit,
+});
+
+// Deposit用のPaymentトランザクション処理用のスキーマ
+const DepositSchema = z.object({
+  currency: CommonSchema.currency,
+  issuer: CommonSchema.issuer,
+  amount: CommonSchema.amount,
+  destination: CommonSchema.destination,
 });
 
 export async function setTrustline(_: unknown, formData: FormData): Promise<TrustlineSetResponse> {
@@ -87,8 +99,6 @@ export async function setTrustline(_: unknown, formData: FormData): Promise<Trus
 // Deposit用のPaymentトランザクション処理
 export async function depositAsset(_: unknown, formData: FormData): Promise<DepositResponse> {
   try {
-    console.log('Deposit Action: Starting depositAsset function');
-
     // フォームデータから値を取得
     const input = {
       currency: formData.get('currency') as string,
@@ -97,35 +107,27 @@ export async function depositAsset(_: unknown, formData: FormData): Promise<Depo
       destination: formData.get('destination') as string,
     };
 
-    console.log('Deposit Action: Extracted input data:', input);
-
     // スキーマで検証
-    console.log('Deposit Action: Validating input with schema');
     const parsed = DepositSchema.safeParse(input);
     if (!parsed.success) {
-      console.error('Deposit Action: Schema validation failed:', parsed.error);
       return { ok: false, error: 'Invalid input data' };
     }
 
-    console.log('Deposit Action: Schema validation successful');
-
-    // JWTトークンを取得（実際の実装では適切な認証処理が必要）
+    // JWTトークンを取得
     const jwt = formData.get('jwt') as string;
     if (!jwt) {
-      console.error('Deposit Action: JWT token missing from FormData');
       return { ok: false, error: 'Authentication required' };
     }
 
-    console.log('Deposit Action: JWT token found, length:', jwt.length);
-
     // XUMM SDKでトランザクションを送信
-    console.log('Deposit Action: Creating XUMM SDK instance');
     const xumm = new XummSdkJwt(jwt);
 
     // 通貨コードをXRPL用に16進数エンコード
-    console.log('Deposit Action: Encoding currency code:', parsed.data.currency);
     const encodedCurrency = encodeCurrencyCode(parsed.data.currency);
-    console.log('Deposit Action: Encoded currency:', encodedCurrency);
+
+    // UUIDを生成して16進数エンコード
+    const uuid = crypto.randomUUID();
+    const encodedUuid = encodeUuid(uuid);
 
     // Paymentトランザクションのペイロードを作成
     const payload = {
@@ -138,42 +140,119 @@ export async function depositAsset(_: unknown, formData: FormData): Promise<Depo
           issuer: parsed.data.issuer,
           value: parsed.data.amount,
         },
+        Memos: [
+          {
+            Memo: {
+              MemoType: '746578742f706c61696e', // "text/plain" in hex
+              MemoFormat: '746578742f706c61696e', // "text/plain" in hex
+              MemoData: encodedUuid, // UUID in hex
+            },
+          },
+        ],
       } as const,
     };
 
-    console.log('Deposit Action: Created transaction payload:', JSON.stringify(payload, null, 2));
-
     // トランザクションを送信
-    console.log('Deposit Action: Sending transaction to XUMM');
     const result = await xumm.payload.create(payload);
-    console.log('Deposit Action: XUMM response:', result);
 
     if (result?.uuid) {
       // 成功時はキャッシュを再検証
-      console.log('Deposit Action: Transaction created successfully, revalidating cache');
       revalidateTag('deposit');
       return {
         ok: true,
         txHash: result.uuid,
-        signUrl: result.next?.always, // 署名用URLを追加
+        signUrl: result.next?.always,
       };
     } else {
-      console.error('Deposit Action: Failed to create transaction, no UUID in response');
       return { ok: false, error: 'Failed to create deposit transaction' };
     }
   } catch (error) {
-    console.error('Deposit Action: Unexpected error occurred');
-    console.error('Deposit Action: Error type:', error?.constructor?.name);
-    console.error(
-      'Deposit Action: Error message:',
-      error instanceof Error ? error.message : 'Unknown error'
-    );
-    console.error(
-      'Deposit Action: Error stack:',
-      error instanceof Error ? error.stack : 'No stack trace'
-    );
-    console.error('Deposit Action: Full error object:', error);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
 
+// Claim用のPaymentトランザクション処理
+export async function claimAsset(_: unknown, formData: FormData): Promise<ClaimResponse> {
+  try {
+    // フォームデータから値を取得
+    const input = {
+      currency: formData.get('currency') as string,
+      issuer: formData.get('issuer') as string,
+      amount: formData.get('amount') as string,
+      uuid: formData.get('uuid') as string,
+      userAddress: formData.get('userAddress') as string,
+    };
+
+    // スキーマで検証
+    const ClaimSchema = z.object({
+      currency: CommonSchema.currency,
+      issuer: CommonSchema.issuer,
+      amount: CommonSchema.amount,
+      uuid: CommonSchema.uuid,
+      userAddress: CommonSchema.userAddress,
+    });
+
+    const parsed = ClaimSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: 'Invalid input data' };
+    }
+
+    // JWTトークンを取得
+    const jwt = formData.get('jwt') as string;
+    if (!jwt) {
+      return { ok: false, error: 'Authentication required' };
+    }
+
+    // XUMM SDKでトランザクションを送信
+    const xumm = new XummSdkJwt(jwt);
+
+    // 通貨コードをXRPL用に16進数エンコード
+    const encodedCurrency = encodeCurrencyCode(parsed.data.currency);
+
+    // UUIDを16進数エンコード
+    const encodedUuid = encodeUuid(parsed.data.uuid);
+
+    // Paymentトランザクションのペイロードを作成（mint処理）
+    const payload = {
+      txjson: {
+        TransactionType: 'Payment',
+        Flags: 0,
+        Destination: parsed.data.userAddress,
+        Amount: {
+          currency: encodedCurrency,
+          issuer: parsed.data.issuer,
+          value: parsed.data.amount,
+        },
+        Memos: [
+          {
+            Memo: {
+              MemoType: '746578742f706c61696e', // "text/plain" in hex
+              MemoFormat: '746578742f706c61696e', // "text/plain" in hex
+              MemoData: encodedUuid,
+            },
+          },
+        ],
+      } as const,
+    };
+
+    // トランザクションを送信
+    const result = await xumm.payload.create(payload);
+
+    if (result?.uuid) {
+      // 成功時はキャッシュを再検証
+      revalidateTag('claim');
+      return {
+        ok: true,
+        txHash: result.uuid,
+        signUrl: result.next?.always,
+      };
+    } else {
+      return { ok: false, error: 'Failed to create claim transaction' };
+    }
+  } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',

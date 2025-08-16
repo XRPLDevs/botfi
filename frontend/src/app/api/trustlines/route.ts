@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { AccountLinesTrustline } from 'xrpl';
-import { XummSdkJwt } from 'xumm-sdk';
 import { cacheTags } from '@/lib/cacheTags';
 import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { XRPLClient } from '@/lib/xrplClient';
 import { decodeCurrencyCode, encodeCurrencyCode } from '@/utils/currency';
+import { validateJwt, createErrorResponse, createSuccessResponse, ApiLogger } from '@/lib/api-utils';
 
 // レスポンス用の型定義
 type TrustlineResponse = {
@@ -17,28 +17,29 @@ type TrustlineResponse = {
 };
 
 export async function GET(request: Request, _context: { params: Promise<Record<string, never>> }) {
+  const logger = new ApiLogger('Trustlines API');
+  
   try {
-    const authHeader = request.headers.get('authorization');
+    logger.info('Starting request processing');
 
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // JWT認証
+    const jwtValidation = await validateJwt(request, 'Trustlines API');
+    if (!jwtValidation.success) {
+      logger.warn('JWT validation failed', { error: jwtValidation.error });
+      return createErrorResponse('Trustlines API', null, jwtValidation.status, jwtValidation.error);
     }
 
-    const jwt = authHeader.split(' ')[1];
+    const { address, jwtData } = jwtValidation;
+    logger.info('JWT validation successful', { address });
 
-    const xumm = new XummSdkJwt(jwt);
-
-    const appDetails = await xumm.ping();
-    const jwtData = appDetails.jwtData as { [key: string]: string };
-
-    if (!jwtData) {
-      return NextResponse.json({ error: 'Invalid JWT' }, { status: 401 });
-    }
-
-    const address = jwtData.sub;
-
+    // XRPLクライアントの初期化
     const xrplClient = new XRPLClient(jwtData.network_endpoint);
+    logger.debug('XRPL client initialized', { networkEndpoint: jwtData.network_endpoint });
+
+    // アカウントのtrustline情報を取得
+    logger.debug('Fetching account lines', { address });
     const accountLines = await xrplClient.requestAccountLines(address);
+    logger.info('Account lines fetched', { count: accountLines.length });
 
     // 既存のtrustlineをマップ（currency.ts内で制御される）
     const existingTrustlines = new Map<string, AccountLinesTrustline>();
@@ -47,6 +48,8 @@ export async function GET(request: Request, _context: { params: Promise<Record<s
       const key = `${decodedCurrency}_${line.account}`;
       existingTrustlines.set(key, line);
     }
+
+    logger.debug('Existing trustlines mapped', { count: existingTrustlines.size });
 
     // 必須トークンを含むtrustlineStatusを作成
     const trustlineStatus: TrustlineResponse[] = getPrimaryTokenConfigs().map(
@@ -98,14 +101,16 @@ export async function GET(request: Request, _context: { params: Promise<Record<s
 
     // 必須トークン + その他のトークンを結合
     const allTrustlines = [...trustlineStatus, ...otherTrustlines];
+    
+    logger.info('Trustlines processed successfully', {
+      primaryTokens: trustlineStatus.length,
+      otherTokens: otherTrustlines.length,
+      total: allTrustlines.length
+    });
 
-    // キャッシュタグをヘッダーに追加
-    const response = NextResponse.json(allTrustlines);
-    response.headers.set('Cache-Tag', cacheTags.trustline);
-
-    return response;
+    return createSuccessResponse(allTrustlines, cacheTags.trustline);
   } catch (error) {
-    console.error('Trustlines API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Unexpected error occurred', error);
+    return createErrorResponse('Trustlines API', error);
   }
 }

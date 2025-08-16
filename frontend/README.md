@@ -1,8 +1,31 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Variables
+
+This project requires several environment variables to be set. Create a `.env.local` file in the frontend directory with the following variables:
+
+```bash
+# XRPL設定
+# XRPLノードのWebSocket URL
+XRPL_NODE_URL=wss://s.altnet.rippletest.net:51233
+
+# Issuer Wallet設定
+# bRLUSDのissuer walletのseed（本番環境では必ず変更してください）
+ISSUER_WALLET_SEED=sEdSeQzGsKzSCnbRsJJmy6W1SG8f1Hi
+
+# 環境設定
+NODE_ENV=development
+```
+
+### Security Notes
+
+- **ISSUER_WALLET_SEED**: This is a sensitive credential that controls the issuer wallet. Never commit this to version control.
+- **Production Environment**: Always use a different seed in production and ensure it's stored securely.
+- **Environment Separation**: Use different seeds for development, staging, and production environments.
+
 ## Getting Started
 
-First, run the development server:
+First, set up your environment variables as described above, then run the development server:
 
 ```bash
 npm run dev

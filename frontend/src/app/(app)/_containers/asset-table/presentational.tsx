@@ -8,17 +8,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { AssetInfo, TrustlineStatus } from './types';
+import type { AssetInfo, TrustlineStatus, ClaimStatus } from './types';
 
-// 共通のテーブルヘッダー
+// Common table header
 export function AssetTableHeader() {
   return (
     <TableHeader>
       <TableRow>
-        <TableHead className="w-[100px]">資産</TableHead>
-        <TableHead className="w-[200px]">暗号資産名</TableHead>
-        <TableHead className="w-[100px]">残高</TableHead>
-        <TableHead className="text-right w-[200px]">アクション</TableHead>
+        <TableHead className="w-[100px]">Asset</TableHead>
+        <TableHead className="w-[200px]">Cryptocurrency</TableHead>
+        <TableHead className="w-[140px]">Balance</TableHead>
+        <TableHead className="w-[140px]">Claimable</TableHead>
+        <TableHead className="text-right w-[200px]">Actions</TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -27,143 +28,152 @@ export function AssetTableHeader() {
 type AssetTableViewProps = {
   assets: AssetInfo[];
   trustlineStatus: TrustlineStatus;
+  claimStatus: ClaimStatus | null;
   isLoading: boolean;
   error: string | null;
-  onOpenDialog: (type: 'deposit' | 'withdraw' | 'setTrustline', asset: AssetInfo) => void;
+  onOpenDialog: (type: 'deposit' | 'withdraw' | 'setTrustline' | 'claim', asset: AssetInfo) => void;
 };
 
-// アクション列の表示内容を決定する関数
+// Function to display claimable amount
+function getClaimableAmount(asset: AssetInfo, claimStatus: ClaimStatus | null): React.ReactNode {
+  const { type } = asset;
+  
+  // Only display claimable amount for bRLUSD currency
+  if (type === 'bRLUSD' && claimStatus?.bRLUSD) {
+    const claimInfo = claimStatus.bRLUSD;
+    if (claimInfo.canClaim && parseFloat(claimInfo.claimableAmount) > 0) {
+              return (
+          <div className="text-sm">
+            <span className="font-medium">
+              {claimInfo.claimableAmount}
+            </span>
+          </div>
+        );
+    }
+  }
+  
+  // Display "-" for other currencies
+  return <div className="text-sm text-muted-foreground">-</div>;
+}
+
+// Common button generation function
+function createActionButton(
+  text: string,
+  onClick: () => void,
+  disabled: boolean = false,
+  variant: 'outline' | 'default' = 'outline'
+) {
+  return (
+    <Button
+      variant={variant}
+      size="sm"
+      className="cursor-pointer"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {text}
+    </Button>
+  );
+}
+
+// Function to determine the display content of the action column
 function getActionContent(
   asset: AssetInfo,
   trustlineStatus: TrustlineStatus,
-  onOpenDialog: (type: 'deposit' | 'withdraw' | 'setTrustline', asset: AssetInfo) => void
+  claimStatus: ClaimStatus | null,
+  onOpenDialog: (type: 'deposit' | 'withdraw' | 'setTrustline' | 'claim', asset: AssetInfo) => void
 ) {
   const { type, hasTrustline, balance } = asset;
 
-  // bRLUSD通貨の場合
-  if (type === 'bRLUSD') {
-    if (!hasTrustline) {
-      return (
-        <Button
-          variant="outline"
-          size="sm"
-          className="cursor-pointer"
-          onClick={() => onOpenDialog('setTrustline', asset)}
-        >
-          Set Trustline
-        </Button>
-      );
-    } else {
-      return (
-        <Button
-          variant="outline"
-          size="sm"
-          className="cursor-pointer"
-          disabled={balance <= 0}
-          onClick={() => onOpenDialog('withdraw', asset)}
-        >
-          Withdraw
-        </Button>
-      );
-    }
+  // When Trustline is not set
+  if (!hasTrustline) {
+    return createActionButton('Set Trustline', () => onOpenDialog('setTrustline', asset));
   }
 
-  // PRO通貨の場合
-  if (type === 'PRO') {
-    if (!hasTrustline) {
+  // Process by currency type
+  switch (type) {
+    case 'bRLUSD': {
+      const canClaim = claimStatus?.bRLUSD?.canClaim || false;
       return (
-        <Button
-          variant="outline"
-          size="sm"
-          className="cursor-pointer"
-          onClick={() => onOpenDialog('setTrustline', asset)}
-        >
-          Set Trustline
-        </Button>
-      );
-    } else {
-      return (
-        <Button
-          variant="outline"
-          size="sm"
-          className="cursor-pointer"
-          disabled={balance <= 0}
-          onClick={() => onOpenDialog('withdraw', asset)}
-        >
-          Withdraw
-        </Button>
+        <div className="flex gap-2 justify-end">
+          {canClaim && createActionButton('Claim', () => onOpenDialog('claim', asset))}
+          {/* bRLUSDのwithdrawボタンを一時的に非表示 */}
+          {/* {createActionButton('Withdraw', () => onOpenDialog('withdraw', asset), balance <= 0)} */}
+        </div>
       );
     }
-  }
 
-  // RLUSD通貨の場合
-  if (type === 'RLUSD') {
-    if (!hasTrustline) {
-      return (
-        <Button
-          variant="outline"
-          size="sm"
-          className="cursor-pointer"
-          onClick={() => onOpenDialog('setTrustline', asset)}
-        >
-          Set Trustline
-        </Button>
-      );
-    } else {
-      // bRLUSDのTrustline状態を確認
+    case 'PRO':
+      return createActionButton('Withdraw', () => onOpenDialog('withdraw', asset), balance <= 0);
+
+    case 'RLUSD': {
       const brlusdHasTrustline = trustlineStatus.bRLUSD || false;
-
       if (!brlusdHasTrustline) {
         return (
           <div className="text-sm text-amber-600 dark:text-amber-400 text-center px-2 py-1">
-            bRLUSDのTrustlineを解除してください。
+            Please remove bRLUSD Trustline.
           </div>
         );
-      } else {
-        return (
-          <Button
-            variant="outline"
-            size="sm"
-            className="cursor-pointer"
-            disabled={balance <= 0}
-            onClick={() => onOpenDialog('deposit', asset)}
-          >
-            Deposit
-          </Button>
-        );
       }
+      return createActionButton('Deposit', () => onOpenDialog('deposit', asset), balance <= 0);
     }
-  }
 
-  // その他の通貨の場合
-  if (!hasTrustline) {
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        className="cursor-pointer"
-        onClick={() => onOpenDialog('setTrustline', asset)}
-      >
-        Set Trustline
-      </Button>
-    );
-  } else {
-    return <div className="text-sm text-muted-foreground text-center px-2 py-1">Trustline Set</div>;
+    default:
+      return <div className="text-sm text-muted-foreground text-center px-2 py-1">Trustline Set</div>;
   }
 }
 
-export const AssetTableView = memo(
-  ({ assets, trustlineStatus, isLoading, error, onOpenDialog }: AssetTableViewProps) => {
-    if (isLoading) {
-      return <div>Loading...</div>;
-    }
+// Helper function to format address in abbreviated notation
+function formatAddress(address: string): string {
+  if (address.length <= 16) return address;
+  return `${address.slice(0, 8)}...${address.slice(-6)}`;
+}
 
+export const AssetTableView = memo(
+  ({ assets, trustlineStatus, claimStatus, isLoading, error, onOpenDialog }: AssetTableViewProps) => {
     if (error) {
       return <div className="text-destructive">Error: {error}</div>;
     }
 
-    if (assets.length === 0) {
-      return <div className="text-muted-foreground">No assets found</div>;
+    // ローディング中またはデータがない場合は、スケルトンテーブルを表示
+    if (isLoading || assets.length === 0) {
+      return (
+        <Table>
+          <AssetTableHeader />
+          <TableBody>
+            {[1, 2, 3].map((index) => (
+              <TableRow key={`skeleton-${index}`}>
+                <TableCell className="w-[100px]">
+                  {/* Cryptocurrency icon skeleton */}
+                  <div className="w-8 h-8 bg-muted rounded-full animate-pulse" />
+                </TableCell>
+                <TableCell className="w-[200px]">
+                  <div className="space-y-2">
+                    <div className="h-4 bg-muted rounded animate-pulse w-16" />
+                    {/* Issuer address skeleton - abbreviated format (8 chars + ... + 6 chars) */}
+                    <div className="flex items-center space-x-1">
+                      <div className="h-3 bg-muted rounded animate-pulse w-8" />
+                      <div className="h-3 bg-muted rounded animate-pulse w-2" />
+                      <div className="h-3 bg-muted rounded animate-pulse w-2" />
+                      <div className="h-3 bg-muted rounded animate-pulse w-2" />
+                      <div className="h-3 bg-muted rounded animate-pulse w-6" />
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="w-[140px]">
+                  <div className="h-4 bg-muted rounded animate-pulse w-12" />
+                </TableCell>
+                <TableCell className="w-[140px]">
+                  <div className="h-4 bg-muted rounded animate-pulse w-8" />
+                </TableCell>
+                <TableCell className="text-right w-[200px]">
+                  <div className="h-8 bg-muted rounded animate-pulse w-24 ml-auto" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      );
     }
 
     return (
@@ -173,7 +183,7 @@ export const AssetTableView = memo(
           {assets.map((asset) => (
             <TableRow key={asset.id}>
               <TableCell className="w-[100px]">
-                {/* 暗号資産のアイコン画像 */}
+                {/* Cryptocurrency icon image */}
                 <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                   <span className="text-xs font-bold">{asset.type}</span>
                 </div>
@@ -181,12 +191,15 @@ export const AssetTableView = memo(
               <TableCell className="w-[200px]">
                 <p className="font-bold">{asset.type}</p>
                 {asset.issuer && (
-                  <p className="text-xs text-muted-foreground break-all">{asset.issuer}</p>
+                  <p className="text-xs text-muted-foreground break-all">{formatAddress(asset.issuer)}</p>
                 )}
               </TableCell>
-              <TableCell className="w-[100px]">{asset.balance}</TableCell>
+              <TableCell className="w-[140px]">{asset.balance}</TableCell>
+              <TableCell className="w-[140px]">
+                {getClaimableAmount(asset, claimStatus)}
+              </TableCell>
               <TableCell className="text-right w-[200px]">
-                {getActionContent(asset, trustlineStatus, onOpenDialog)}
+                {getActionContent(asset, trustlineStatus, claimStatus, onOpenDialog)}
               </TableCell>
             </TableRow>
           ))}

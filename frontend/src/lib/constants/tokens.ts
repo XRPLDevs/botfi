@@ -15,6 +15,9 @@ export const ISSUERS = {
   [TOKENS.RLUSD]: 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV',
 } as const;
 
+// deposit addressの定数
+export const DEPOSIT_ADDRESS = 'rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x';
+
 // 表示名の定数
 export const DISPLAY_NAMES = {
   [TOKENS.BRLUSD]: 'bRLUSD',
@@ -54,75 +57,8 @@ export function getPrimaryTokenConfigs() {
 
 // 特定のトークン設定の取得（存在チェック付き）
 export function getTokenConfigSafe(tokenName: string) {
-  if (isTokenExists(tokenName)) {
-    return getTokenConfig(tokenName);
+  if (Object.values(TOKENS).includes(tokenName as TokenName)) {
+    return getTokenConfig(tokenName as TokenName);
   }
   return null;
-}
-
-// トークン名変更時の影響範囲を最小化するユーティリティ関数
-
-/**
- * トークン名を変更する際のヘルパー関数
- * 新しいトークン名を設定し、関連する定数を自動更新
- */
-export function updateTokenName(oldTokenKey: keyof typeof TOKENS, newTokenName: string) {
-  // この関数は開発時のみ使用し、本番環境では定数を直接編集
-  console.warn(
-    `Token name update: ${oldTokenKey} -> ${newTokenName}. ` +
-      'Please update the constants file directly for production use.'
-  );
-
-  return {
-    oldName: TOKENS[oldTokenKey],
-    newName: newTokenName,
-    affectedConstants: ['TOKENS', 'ISSUERS', 'DISPLAY_NAMES', 'DESCRIPTIONS', 'PRIMARY_TOKENS'],
-  };
-}
-
-/**
- * トークンの存在確認
- */
-export function isTokenExists(tokenName: string): tokenName is TokenName {
-  return Object.values(TOKENS).includes(tokenName as TokenName);
-}
-
-/**
- * トークンの発行者アドレス取得
- */
-export function getTokenIssuer(tokenName: TokenName): string {
-  return ISSUERS[tokenName];
-}
-
-/**
- * 主要トークンかどうかの判定
- */
-export function isPrimaryToken(tokenName: TokenName): boolean {
-  return PRIMARY_TOKENS.includes(tokenName);
-}
-
-/**
- * トークン設定の検証
- */
-export function validateTokenConfig(tokenName: TokenName): boolean {
-  const config = getTokenConfig(tokenName);
-  return !!(config.currency && config.issuer && config.displayName && config.description);
-}
-
-/**
- * 全トークン設定の検証
- */
-export function validateAllTokenConfigs(): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  Object.values(TOKENS).forEach((tokenName) => {
-    if (!validateTokenConfig(tokenName)) {
-      errors.push(`Invalid configuration for token: ${tokenName}`);
-    }
-  });
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
 }

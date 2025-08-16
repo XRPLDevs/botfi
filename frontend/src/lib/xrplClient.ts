@@ -25,6 +25,23 @@ export class XRPLClient {
     return lines;
   }
 
+  public async requestAccountTx(address: string, limit: number = 100): Promise<any[]> {
+    const response = await this.withConnection(async (client) => {
+      const accountTx = await client.request({
+        command: 'account_tx',
+        account: address,
+        ledger_index_min: -1,
+        ledger_index_max: -1,
+        binary: false,
+        limit: limit,
+        forward: false,
+      });
+      return accountTx;
+    });
+
+    return response.result.transactions || [];
+  }
+
   private async withConnection<T>(callback: (client: Client) => Promise<T>): Promise<T> {
     try {
       await this.client.connect();

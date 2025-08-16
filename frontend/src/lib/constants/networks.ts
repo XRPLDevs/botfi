@@ -45,13 +45,3 @@ export function validateNetworkConfig(network: NetworkType): boolean {
   const config = getNetworkConfig(network);
   return !!(config.BRLUSD_ISSUER && config.RLUSD_ISSUER && config.DEPOSIT_WALLET);
 }
-
-// ネットワーク情報の取得
-export function getNetworkInfo(network: NetworkType) {
-  return {
-    name: network,
-    url: NETWORK_URLS[network],
-    config: getNetworkConfig(network),
-    isValid: validateNetworkConfig(network),
-  };
-}
