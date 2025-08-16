@@ -1,0 +1,478 @@
+# Next.js App Router 状態管理ガイドライン
+
+## 1. 基本方針（RSCファースト状態管理）
+
+### サーバ状態の管理
+- サーバ状態はサーバで持つ（＝RSCで取得・描画）
+- 読み取りは Server Components。fetch() の Request Memoization / cache() / unstable_cache() を活用
+- ミューテーションは Server Actions（zod 検証 → Result型で返す → revalidateTag()）
+
+### クライアント状態の管理
+- クライアント状態は最小化（UI・入力・接続・一時キャッシュ）
+- 局所は useState、機能横断は zustand
+- サーバ由来データを zustand に複製しない（二重管理禁止）
+
+### 整合性の原則
+- 整合性はサーバが権威
+- 楽観更新は OK。ただし最終確定は SA 成功 + revalidateTag() の再描画で合わせる
+- リアルタイム更新（SSE等）は UI のみ即時反映、後段で再検証
+
+### スキーマ管理
+- zod は単一ソース
+- 入力検証/型推論/エラーメッセージを 共通スキーマ で一元化（サーバで最終判定）
+
+## 2. 役割・責務の分解
+
+| 役割 | 責務 | 実装場所 |
+|------|------|----------|
+| **Server Fetcher** | サーバ状態の取得関数。純粋（副作用禁止）・メモ化・タグ付与 | `server-only` |
+| **Container** | 取得だけして Presentational に渡す | Server |
+| **Presentational** | 描画だけ（shadcn/ui＋Tailwind） | Shared |
+| **Client Widget** | フォーム・署名・モーダルなど、ブラウザ機能が必要な最小単位 | Client |
+| **Zustand Store** | UI状態・接続・短時間のローカルキャッシュ（非権威） | Client |
+| **Server Action** | 変更系。zod で検証 → Result 返却 → revalidateTag() | Server |
+
+## 3. ディレクトリ規約（状態関連の配置）
+
+```
+app/(segment)/
+  page.tsx / layout.tsx                 # RSC（外殻）
+  _containers/<feature>/
+    container.tsx                       # Server：取得
+    presentational.tsx                  # Shared：描画
+    client/<widget>.tsx                 # Client：イベント/状態
+    fallback.tsx                        # Skeleton（固定高）
+  _lib/
+    fetchers.ts                         # server-only：取得API（memo化&タグ統一）
+    actions.ts                          # Server Actions（Result型）
+    preload.ts                          # preloadパターン
+lib/
+  cacheTags.ts                          # 再検証タグ
+  utils.ts                              # cn(), Result型 etc.
+schemas/
+  <feature>.ts                          # zodスキーマ（共通）
+server/
+  queries/*.ts                          # 読み取り（unstable_cache / cache）
+  mutations/*.ts                        # 変更（SA内部から呼ぶだけ）
+stores/
+  <feature>Store.ts                     # "use client"（zustand）
+hooks/
+  useStream.ts                          # "use client"（SSE/WS）
+types/
+  *.ts
+```
+
+## 4. パターン別サンプル（抽象コード）
+
+### A. サーバ状態（RSCで取得）＋ Presentational
+
+#### Fetchers
+```typescript
+// app/(segment)/_lib/fetchers.ts
+import 'server-only'
+import { unstable_cache } from 'next/cache'
+import { cache } from 'react'
+import { cacheTags } from '@/lib/cacheTags'
+
+async function _readResource() {
+  // DB/APIから読取（副作用なし）
+  return { title: 'Resource', amount: 1.23 }
+}
+
+export const getResource = unstable_cache(_readResource, ['resource-read'], {
+  tags: [cacheTags.resource], 
+  revalidate: 10,
+})
+
+export const getEntityById = cache(async (id: string) => {
+  // DB直アクセスでも純粋 & メモ化
+  return { id, name: 'Entity' }
+})
+```
+
+#### Container
+```tsx
+// app/(segment)/_containers/resource/container.tsx  (Server)
+import { getResource } from '../../_lib/fetchers'
+import { ResourceView } from './presentational'
+
+export default async function ResourceContainer() {
+  const data = await getResource()
+  return <ResourceView data={data} />
+}
+```
+
+#### Presentational
+```tsx
+// app/(segment)/_containers/resource/presentational.tsx  (Shared)
+type Props = { data: { title: string; amount: number } }
+
+export function ResourceView({ data }: Props) {
+  return (
+    <div className="rounded-2xl border p-4">
+      <div className="text-sm text-muted-foreground">{data.title}</div>
+      <div className="text-2xl">{data.amount.toFixed(2)}</div>
+    </div>
+  )
+}
+```
+
+### B. Server Action（zod検証 → Result型 → 再検証）
+
+#### Utils
+```typescript
+// lib/utils.ts
+export type Result<T, E = string> = 
+  | { ok: true; value: T } 
+  | { ok: false; error: E }
+
+export const ok = <T>(value: T): Result<T> => ({ ok: true, value })
+export const err = <E>(error: E): Result<never, E> => ({ ok: false, error })
+```
+
+#### Schema
+```typescript
+// schemas/feature.ts
+import { z } from 'zod'
+
+export const UpdateSchema = z.object({
+  id: z.string().min(1),
+  amount: z.coerce.number().positive(),
+})
+
+export type UpdateInput = z.infer<typeof UpdateSchema>
+```
+
+#### Action
+```typescript
+// app/(segment)/_lib/actions.ts
+'use server'
+
+import { revalidateTag } from 'next/cache'
+import { UpdateSchema } from '@/schemas/feature'
+import { cacheTags } from '@/lib/cacheTags'
+import { ok, err, type Result } from '@/lib/utils'
+
+export async function updateFeature(
+  _: unknown, 
+  formData: FormData
+): Promise<Result<null>> {
+  const input = Object.fromEntries(formData) // { id: '...', amount: '...' }
+  const parsed = UpdateSchema.safeParse(input)
+  
+  if (!parsed.success) return err('invalid_input')
+
+  // 変更ロジック（DB/XRPLなど）
+  // await mutate(parsed.data)
+
+  revalidateTag(cacheTags.resource)
+  return ok(null)
+}
+```
+
+#### Client Form
+```tsx
+// app/(segment)/_containers/feature/client/form.tsx (Client)
+'use client'
+import { useActionState } from 'react'
+import { updateFeature } from '../../_lib/actions'
+
+export function FeatureForm() {
+  const [state, action] = useActionState(updateFeature, null)
+  
+  return (
+    <form action={action} className="space-y-2">
+      <input 
+        name="id" 
+        className="w-40 rounded border px-2 py-1" 
+        placeholder="id" 
+      />
+      <input 
+        name="amount" 
+        type="number" 
+        className="w-40 rounded border px-2 py-1" 
+        placeholder="1.23" 
+      />
+      <button className="rounded bg-foreground px-3 py-1 text-background">
+        Submit
+      </button>
+      {/* 予測可能エラーは Result で表示、throw しない */}
+      {state && 'ok' in state && !state.ok && (
+        <p className="text-sm text-red-600">{state.error}</p>
+      )}
+    </form>
+  )
+}
+```
+
+### C. 楽観更新（zustand で一時反映 → 失敗でロールバック）
+
+#### Store
+```typescript
+// stores/featureStore.ts  (Client)
+'use client'
+import { create } from 'zustand'
+
+type FeatureItem = { id: string; amount: number }
+
+type FeatureState = {
+  patch: Record<string, number> // id -> optimistic amount
+  apply: (id: string, next: number) => void
+  rollback: (id: string) => void
+  clear: () => void
+}
+
+export const useFeatureStore = create<FeatureState>((set) => ({
+  patch: {},
+  apply: (id, next) => set((s) => ({ 
+    patch: { ...s.patch, [id]: next } 
+  })),
+  rollback: (id) => set((s) => { 
+    const { [id]: _, ...rest } = s.patch
+    return { patch: rest } 
+  }),
+  clear: () => set({ patch: {} }),
+}))
+```
+
+#### Presentational with Optimistic
+```tsx
+// app/(segment)/_containers/feature/presentational.tsx (Shared)
+type Props = { 
+  item: { id: string; amount: number }
+  optimistic?: number 
+}
+
+export function FeatureRow({ item, optimistic }: Props) {
+  const display = optimistic ?? item.amount
+  return <div className="rounded border p-2">{display.toFixed(2)}</div>
+}
+```
+
+#### Optimistic Update Button
+```tsx
+// app/(segment)/_containers/feature/client/optimistic-update.tsx (Client)
+'use client'
+import { useTransition } from 'react'
+import { useFeatureStore } from '@/stores/featureStore'
+import { updateFeature } from '../../_lib/actions'
+
+export function OptimisticButton({ id, current }: { id: string; current: number }) {
+  const { apply, rollback } = useFeatureStore()
+  const [pending, start] = useTransition()
+
+  return (
+    <button
+      className="rounded border px-2 py-1"
+      disabled={pending}
+      onClick={() => {
+        const next = current + 1
+        apply(id, next)
+        
+        start(async () => {
+          const fd = new FormData()
+          fd.set('id', id)
+          fd.set('amount', String(next))
+          const res = await updateFeature(null, fd)
+          
+          if (!res.ok) rollback(id) // 失敗時は巻き戻し
+        })
+      }}
+    >
+      +1
+    </button>
+  )
+}
+```
+
+> **注意**: `revalidateTag()` による再取得でサーバ値へ最終収束させます。patch は表示時にマージ（`optimistic ?? server`）。
+
+### D. SSE/WS 購読（UIのみ即時反映 → 後で再検証）
+
+#### Hook
+```typescript
+// hooks/useStream.ts (Client)
+'use client'
+import { useEffect } from 'react'
+
+export function useStream(onMessage: (data: unknown) => void) {
+  useEffect(() => {
+    const es = new EventSource('/api/stream')
+    es.onmessage = (e) => onMessage(JSON.parse(e.data))
+    return () => es.close()
+  }, [onMessage])
+}
+```
+
+#### Store
+```typescript
+// stores/realtimeStore.ts (Client)
+'use client'
+import { create } from 'zustand'
+
+type RTState = { 
+  events: Array<{ id: string; value: number }> 
+}
+
+export const useRealtime = create<RTState>(() => ({ events: [] }))
+```
+
+#### Live Panel
+```tsx
+// app/(segment)/_containers/live/client/live-panel.tsx (Client)
+'use client'
+import { useStream } from '@/hooks/useStream'
+import { useRealtime } from '@/stores/realtimeStore'
+
+export function LivePanel() {
+  const events = useRealtime((s) => s.events)
+  const set = useRealtime.setState
+  
+  useStream((data) => set((s) => ({ 
+    events: [data as any, ...s.events].slice(0, 20) 
+  })))
+  
+  return (
+    <ul className="text-sm">
+      {events.map((e) => (
+        <li key={e.id}>{e.value}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+> **注意**: SSE の値は「参考表示」。サーバ権威は別途 RSC の再検証で反映。
+
+### E. フォーム（shadcn/ui × zod × Server Action）
+
+#### Schema
+```typescript
+// schemas/form.ts
+import { z } from 'zod'
+
+export const FormSchema = z.object({
+  name: z.string().min(1),
+  amount: z.coerce.number().min(0),
+})
+
+export type FormInput = z.infer<typeof FormSchema>
+```
+
+#### Action
+```typescript
+// app/(segment)/_lib/actions.ts
+'use server'
+import { FormSchema } from '@/schemas/form'
+import { ok, err, type Result } from '@/lib/utils'
+
+export async function submitForm(
+  _: unknown, 
+  form: FormData
+): Promise<Result<{ id: string }>> {
+  const input = Object.fromEntries(form)
+  const parsed = FormSchema.safeParse(input)
+  
+  if (!parsed.success) return err('invalid')
+  
+  // 保存/送信…
+  return ok({ id: 'new-id' })
+}
+```
+
+#### Form Component
+```tsx
+// app/(segment)/_containers/form/client/form.tsx (Client)
+'use client'
+import { useActionState } from 'react'
+import { submitForm } from '../../_lib/actions'
+
+export function GenericForm() {
+  const [state, action] = useActionState(submitForm, null)
+  
+  return (
+    <form action={action} className="space-y-2">
+      <input 
+        name="name" 
+        className="w-64 rounded border px-2 py-1" 
+        placeholder="name" 
+      />
+      <input 
+        name="amount" 
+        type="number" 
+        className="w-40 rounded border px-2 py-1" 
+        placeholder="0" 
+      />
+      <button className="rounded bg-foreground px-3 py-1 text-background">
+        Save
+      </button>
+      {state && !state.ok && (
+        <p className="text-sm text-red-600">{state.error}</p>
+      )}
+    </form>
+  )
+}
+```
+
+## 5. zustand の設計ガイド
+
+### スコープ
+- **局所（ウィジェット単位）**: `useState` or スライス小さめの zustand
+- **横断（接続状態・UIプリファレンス）**: zustand + persist
+
+### 選択子（selectors）
+- `useStore((s) => s.part)` を徹底（不要レンダー回避）
+- アクションは `set` 経由で一括更新（Immerは必要時のみ）
+
+### 初期状態
+- SSRと一致する静的値で初期化
+- マウント後に実値へ遅延更新（Hydration不一致回避）
+
+### 永続化
+- `persist` を使う場合、機微情報は保存しない（アドレス可、秘密鍵等は絶対不可）
+- 互換性用の `version` と `migrate` を用意
+
+### ミドルウェア
+- 開発時のみ `devtools`、運用では外す or noop
+
+## 6. 禁止事項（Anti-Patterns）
+
+| 禁止事項 | 正しいアプローチ |
+|----------|------------------|
+| サーバ由来データを zustand に複製して"真実のソース"にしない | 権威はサーバ。RSCの props を使う |
+| Server Component 内で副作用/状態を持つ（DB書込・Cookie操作・外部送信） | すべて Server Actions/Route へ |
+| "use client" を上位に付けて広範囲を Client 化 | Client は末端の Widget のみ |
+| メモ化抜きのバラバラ fetch（URL/headers/init が毎回違う） | fetchers.ts に統一し、cache()/unstable_cache() を徹底 |
+| 楽観更新だけで確定させる | 必ず revalidateTag() で最終収束 |
+| Skeleton が可変高さ | CLS悪化。固定高にする |
+| zod をクライアントだけ/サーバだけに偏らせる | 共有スキーマを使い回し、最終判定はサーバ |
+
+## 7. 注意事項（実装時の落とし穴）
+
+### Hydration mismatch
+- 初期描画に `Date.now()`/`Math.random()`/`toLocale*` を使わない
+- テーマ/ウォレット表示などクライアント依存値はマウント後に更新
+
+### Dynamic APIs（cookies()/headers()）
+- 使う Server Component は 必ず `<Suspense>` 内に置いてルート全体の動的化を回避
+
+### DataLoader のスコープ
+- `React.cache()` でリクエスト単位に。グローバル共有は NG
+
+### Result型の徹底
+- SAで `throw` 乱発すると App Router の `error.tsx` に落ちて UI ステートが失われる
+- 予測可能エラーは **Result（{ ok: false, error }）**で返して UI で復旧
+
+## 8. PR チェックリスト
+
+- [ ] 取得は RSC・fetchers.ts 経由・メモ化済み
+- [ ] Container=取得のみ／Presentational=描画のみ／Client最小
+- [ ] SA は zod検証 → Result返却 → revalidateTag()
+- [ ] zustand の初期状態がSSRと一致（Hydration OK）
+- [ ] サーバ状態を zustand に複製していない
+- [ ] Suspense で重い島は遅延／Skeleton固定高
+- [ ] Dynamic APIs をルート直下で使っていない
+- [ ] 楽観更新→ロールバックが備わっている（必要な場合）
+
+
+ 楽観更新→ロールバックが備わっている（必要な場合）
