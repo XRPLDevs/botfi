@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  backend
+
+  Sample SAM Template for backend
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  EpochTickFunc:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: app/
+      Handler: src/handlers/epochTick.handler
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Events:
+        ScheduledEvent:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 0 * * ? *) # 毎日午前0時（UTC）
+            Name: EpochTickFuncScheduledEvent
+            Description: Schedule for EpochTickFunc
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+        - src/handlers/epochTick.ts
