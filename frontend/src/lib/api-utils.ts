@@ -7,31 +7,33 @@ export type ApiContext = {
   request: Request;
 };
 
-export type JwtValidationResult = {
-  success: true;
-  jwt: string;
-  jwtData: { [key: string]: string };
-  address: string;
-} | {
-  success: false;
-  error: string;
-  status: number;
-};
+export type JwtValidationResult =
+  | {
+      success: true;
+      jwt: string;
+      jwtData: { [key: string]: string };
+      address: string;
+    }
+  | {
+      success: false;
+      error: string;
+      status: number;
+    };
 
 // JWT認証の共通処理
 export async function validateJwt(request: Request, apiName: string): Promise<JwtValidationResult> {
   const authHeader = request.headers.get('authorization');
-  
+
   if (!authHeader?.startsWith('Bearer ')) {
     return {
       success: false,
       error: 'Unauthorized',
-      status: 401
+      status: 401,
     };
   }
 
   const jwt = authHeader.split(' ')[1];
-  
+
   try {
     const xumm = new XummSdkJwt(jwt);
     const appDetails = await xumm.ping();
@@ -41,7 +43,7 @@ export async function validateJwt(request: Request, apiName: string): Promise<Jw
       return {
         success: false,
         error: 'Invalid JWT',
-        status: 401
+        status: 401,
       };
     }
 
@@ -49,13 +51,13 @@ export async function validateJwt(request: Request, apiName: string): Promise<Jw
       success: true,
       jwt,
       jwtData,
-      address: jwtData.sub
+      address: jwtData.sub,
     };
   } catch (error) {
     return {
       success: false,
       error: 'JWT validation failed',
-      status: 401
+      status: 401,
     };
   }
 }
@@ -69,11 +71,11 @@ export function createErrorResponse(
 ): NextResponse {
   const errorMessage = customMessage || 'Internal server error';
   const errorDetails = error instanceof Error ? error.message : 'Unknown error';
-  
+
   console.error(`${apiName}: ${errorMessage}`, {
     error: errorDetails,
     stack: error instanceof Error ? error.stack : undefined,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   return NextResponse.json(
@@ -89,11 +91,11 @@ export function createErrorResponse(
 // 成功レスポンスの共通処理
 export function createSuccessResponse(data: any, cacheTag?: string): NextResponse {
   const response = NextResponse.json(data);
-  
+
   if (cacheTag) {
     response.headers.set('Cache-Tag', cacheTag);
   }
-  
+
   return response;
 }
 
@@ -106,7 +108,7 @@ export class ApiLogger {
   }
 
   info(message: string, data?: any) {
-    console.log(`${this.apiName}: ${message}`, data || '');
+    // console.log removed for production
   }
 
   warn(message: string, data?: any) {
@@ -119,7 +121,7 @@ export class ApiLogger {
 
   debug(message: string, data?: any) {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`${this.apiName}: [DEBUG] ${message}`, data || '');
+      // console.log removed for production
     }
   }
 }
@@ -129,17 +131,19 @@ export async function parseFormData(request: Request, apiName: string) {
   try {
     const formData = await request.formData();
     const entries = Array.from(formData.entries());
-    
+
     // 機密情報を除いたログ出力
     const safeEntries = entries.map(([key, value]) => [
       key,
-      key.toLowerCase().includes('jwt') || key.toLowerCase().includes('token') 
-        ? '[REDACTED]' 
-        : typeof value === 'string' ? value : 'File/Blob'
+      key.toLowerCase().includes('jwt') || key.toLowerCase().includes('token')
+        ? '[REDACTED]'
+        : typeof value === 'string'
+          ? value
+          : 'File/Blob',
     ]);
-    
-    console.log(`${apiName}: FormData parsed`, { entries: safeEntries });
-    
+
+    // console.log removed for production
+
     return formData;
   } catch (error) {
     console.error(`${apiName}: Failed to parse FormData`, error);

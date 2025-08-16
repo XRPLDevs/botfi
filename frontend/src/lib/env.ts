@@ -4,10 +4,10 @@ import { z } from 'zod';
 const envSchema = z.object({
   // XRPL設定
   XRPL_NODE_URL: z.string().url().default('wss://s.altnet.rippletest.net:51233'),
-  
+
   // Issuer Wallet設定
   ISSUER_WALLET_SEED: z.string().min(1, 'ISSUER_WALLET_SEED is required'),
-  
+
   // 環境設定
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
@@ -18,7 +18,7 @@ function validateEnv() {
     return envSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.issues.map(issue => issue.path.join('.')).join(', ');
+      const missingVars = error.issues.map((issue) => issue.path.join('.')).join(', ');
       throw new Error(`Missing or invalid environment variables: ${missingVars}`);
     }
     throw error;

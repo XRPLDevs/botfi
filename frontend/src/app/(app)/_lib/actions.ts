@@ -5,7 +5,16 @@ import { XummSdkJwt } from 'xumm-sdk';
 import { z } from 'zod';
 import { encodeCurrencyCode } from '@/utils/currency';
 import { encodeUuid } from '@/utils/uuid';
-import type { DepositResponse, TrustlineSetResponse, ClaimResponse } from '../_containers/asset-table/types';
+import {
+  MEMO_TYPE_ID,
+  ENCODED_MEMO_TYPE_ID,
+  ENCODED_MEMO_FORMAT_TEXT_PLAIN,
+} from '@/utils/memo-validation';
+import type {
+  DepositResponse,
+  TrustlineSetResponse,
+  ClaimResponse,
+} from '../_containers/asset-table/types';
 
 // 共通のスキーマ
 const CommonSchema = {
@@ -31,6 +40,15 @@ const DepositSchema = z.object({
   issuer: CommonSchema.issuer,
   amount: CommonSchema.amount,
   destination: CommonSchema.destination,
+});
+
+// Claim用のPaymentトランザクション処理用のスキーマ
+const ClaimSchema = z.object({
+  currency: CommonSchema.currency,
+  issuer: CommonSchema.issuer,
+  amount: CommonSchema.amount,
+  uuid: CommonSchema.uuid,
+  userAddress: CommonSchema.userAddress,
 });
 
 export async function setTrustline(_: unknown, formData: FormData): Promise<TrustlineSetResponse> {
@@ -143,8 +161,8 @@ export async function depositAsset(_: unknown, formData: FormData): Promise<Depo
         Memos: [
           {
             Memo: {
-              MemoType: '746578742f706c61696e', // "text/plain" in hex
-              MemoFormat: '746578742f706c61696e', // "text/plain" in hex
+              MemoType: ENCODED_MEMO_TYPE_ID, // "id" in hex
+              MemoFormat: ENCODED_MEMO_FORMAT_TEXT_PLAIN, // "text/plain" in hex
               MemoData: encodedUuid, // UUID in hex
             },
           },
@@ -187,14 +205,6 @@ export async function claimAsset(_: unknown, formData: FormData): Promise<ClaimR
     };
 
     // スキーマで検証
-    const ClaimSchema = z.object({
-      currency: CommonSchema.currency,
-      issuer: CommonSchema.issuer,
-      amount: CommonSchema.amount,
-      uuid: CommonSchema.uuid,
-      userAddress: CommonSchema.userAddress,
-    });
-
     const parsed = ClaimSchema.safeParse(input);
     if (!parsed.success) {
       return { ok: false, error: 'Invalid input data' };
@@ -229,8 +239,8 @@ export async function claimAsset(_: unknown, formData: FormData): Promise<ClaimR
         Memos: [
           {
             Memo: {
-              MemoType: '746578742f706c61696e', // "text/plain" in hex
-              MemoFormat: '746578742f706c61696e', // "text/plain" in hex
+              MemoType: ENCODED_MEMO_TYPE_ID, // "id" in hex
+              MemoFormat: ENCODED_MEMO_FORMAT_TEXT_PLAIN, // "text/plain" in hex
               MemoData: encodedUuid,
             },
           },

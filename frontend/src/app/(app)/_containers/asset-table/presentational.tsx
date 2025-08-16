@@ -37,21 +37,20 @@ type AssetTableViewProps = {
 // Function to display claimable amount
 function getClaimableAmount(asset: AssetInfo, claimStatus: ClaimStatus | null): React.ReactNode {
   const { type } = asset;
-  
+
   // Only display claimable amount for bRLUSD currency
   if (type === 'bRLUSD' && claimStatus?.bRLUSD) {
     const claimInfo = claimStatus.bRLUSD;
+
     if (claimInfo.canClaim && parseFloat(claimInfo.claimableAmount) > 0) {
-              return (
-          <div className="text-sm">
-            <span className="font-medium">
-              {claimInfo.claimableAmount}
-            </span>
-          </div>
-        );
+      return (
+        <div className="text-sm">
+          <span className="font-medium">{claimInfo.claimableAmount}</span>
+        </div>
+      );
     }
   }
-  
+
   // Display "-" for other currencies
   return <div className="text-sm text-muted-foreground">-</div>;
 }
@@ -94,6 +93,7 @@ function getActionContent(
   switch (type) {
     case 'bRLUSD': {
       const canClaim = claimStatus?.bRLUSD?.canClaim || false;
+
       return (
         <div className="flex gap-2 justify-end">
           {canClaim && createActionButton('Claim', () => onOpenDialog('claim', asset))}
@@ -102,9 +102,6 @@ function getActionContent(
         </div>
       );
     }
-
-    case 'PRO':
-      return createActionButton('Withdraw', () => onOpenDialog('withdraw', asset), balance <= 0);
 
     case 'RLUSD': {
       const brlusdHasTrustline = trustlineStatus.bRLUSD || false;
@@ -119,7 +116,9 @@ function getActionContent(
     }
 
     default:
-      return <div className="text-sm text-muted-foreground text-center px-2 py-1">Trustline Set</div>;
+      return (
+        <div className="text-sm text-muted-foreground text-center px-2 py-1">Trustline Set</div>
+      );
   }
 }
 
@@ -130,7 +129,14 @@ function formatAddress(address: string): string {
 }
 
 export const AssetTableView = memo(
-  ({ assets, trustlineStatus, claimStatus, isLoading, error, onOpenDialog }: AssetTableViewProps) => {
+  ({
+    assets,
+    trustlineStatus,
+    claimStatus,
+    isLoading,
+    error,
+    onOpenDialog,
+  }: AssetTableViewProps) => {
     if (error) {
       return <div className="text-destructive">Error: {error}</div>;
     }
@@ -191,13 +197,13 @@ export const AssetTableView = memo(
               <TableCell className="w-[200px]">
                 <p className="font-bold">{asset.type}</p>
                 {asset.issuer && (
-                  <p className="text-xs text-muted-foreground break-all">{formatAddress(asset.issuer)}</p>
+                  <p className="text-xs text-muted-foreground break-all">
+                    {formatAddress(asset.issuer)}
+                  </p>
                 )}
               </TableCell>
               <TableCell className="w-[140px]">{asset.balance}</TableCell>
-              <TableCell className="w-[140px]">
-                {getClaimableAmount(asset, claimStatus)}
-              </TableCell>
+              <TableCell className="w-[140px]">{getClaimableAmount(asset, claimStatus)}</TableCell>
               <TableCell className="text-right w-[200px]">
                 {getActionContent(asset, trustlineStatus, claimStatus, onOpenDialog)}
               </TableCell>

@@ -33,7 +33,7 @@ export function BaseDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={maxWidthClass}>
+      <DialogContent className={maxWidthClass} showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="text-center">{title}</DialogTitle>
         </DialogHeader>

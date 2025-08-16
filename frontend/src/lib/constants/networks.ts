@@ -1,4 +1,4 @@
-import { ISSUERS } from './tokens';
+import { ISSUERS, DEPOSIT_WALLET } from './tokens';
 
 // ネットワーク設定の定数
 export const NETWORKS = {
@@ -8,9 +8,6 @@ export const NETWORKS = {
 } as const;
 
 export type NetworkType = (typeof NETWORKS)[keyof typeof NETWORKS];
-
-// デポジットウォレットの定数
-export const DEPOSIT_WALLET = 'rnjyMRQTM2eYJcrjm1hXdfaUY6vhjAk4pC';
 
 // ネットワーク設定の取得関数
 export function getNetworkConfig(_network: NetworkType) {

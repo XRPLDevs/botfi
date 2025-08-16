@@ -35,3 +35,35 @@ export function encodeCurrencyCode(asciiString: string) {
     .join('')
     .toUpperCase();
 }
+
+/**
+ * MemoTypeをXRPL用の16進数形式にエンコード
+ * @param memoType - MemoType文字列（例: "id"）
+ * @returns エンコードされた16進数文字列
+ */
+export function encodeMemoType(memoType: string): string {
+  // ASCII文字をバイト配列に変換
+  const bytes = Array.from(memoType).map((ch: string) => ch.charCodeAt(0));
+
+  // バイト配列を16進数文字列に変換
+  return bytes
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+}
+
+/**
+ * MemoTypeをXRPL用の16進数形式からデコード
+ * @param encodedMemoType - エンコードされた16進数文字列
+ * @returns デコードされたMemoType文字列
+ */
+export function decodeMemoType(encodedMemoType: string): string {
+  // 16進数をバイト配列に変換
+  const bytes = [];
+  for (let i = 0; i < encodedMemoType.length; i += 2) {
+    bytes.push(parseInt(encodedMemoType.substr(i, 2), 16));
+  }
+
+  // バイト配列をASCII文字列に変換
+  return String.fromCharCode(...bytes);
+}

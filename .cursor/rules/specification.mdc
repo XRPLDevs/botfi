@@ -1,6 +1,37 @@
 
 # 共通
 
+## トークン仕様
+
+### 取り扱いトークン
+
+#### bRLUSD（BotFi発行ステーブルコイン）
+- **発行者**: rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU
+- **説明**: BotFiで発行するステーブルコイン
+- **用途**: ユーザーがdepositしたRLUSDをbRLUSDとして発行・管理
+
+#### RLUSD（Ripple社発行ステーブルコイン）
+- **発行者**: rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV
+- **説明**: Ripple社が発行しているステーブルコイン
+- **用途**: ユーザーがdepositする元のトークン
+
+### アドレス構成
+
+#### デポジットアドレス
+- **アドレス**: rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x
+- **用途**: ユーザーからのRLUSD depositを受け取る
+- **特徴**: bRLUSD発行アドレスとは異なる
+
+#### bRLUSD発行アドレス
+- **アドレス**: rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU
+- **用途**: bRLUSDトークンの発行・管理
+- **特徴**: デポジットアドレスとは異なる
+
+### 重要な注意事項
+- **デポジット先と発行先の分離**: デポジットアドレスとbRLUSDを発行するアドレスは異なる
+- **セキュリティ**: 発行権限は発行アドレスのみが保有
+- **整合性管理**: UUIDベースの送金履歴追跡による二重mint防止
+
 # 画面仕様
 
 ## スプラッシュ画面
@@ -48,7 +79,7 @@
 - アクション：トップバーのウォレット接続ボタンへの誘導
 
 ### アセットテーブル
-- **表示アセット**：BOT、PRO、RLUSD
+- **表示アセット**：BOT、RLUSD
 - **テーブル列**：アイコン、通貨名・発行者、残高、アクション
 - **ローディング状態**：Skeleton表示
 - **機能**：Trustline確認、残高表示
@@ -61,12 +92,6 @@
 #### アクション列の表示要件
 
 ##### BOT通貨
-- **Trustline未設定時**：「Set Trustline」ボタンを表示
-- **Trustline設定済み時**：「Withdraw」ボタンを表示
-  - **BOT残高が0の場合**：ボタンは非活性
-  - **BOT残高が0を超える場合**：ボタンは活性
-
-##### PRO通貨
 - **Trustline未設定時**：「Set Trustline」ボタンを表示
 - **Trustline設定済み時**：「Withdraw」ボタンを表示
   - **BOT残高が0の場合**：ボタンは非活性
@@ -87,7 +112,7 @@
 - **トリガー**：Set Trustlineボタン押下
 - **自動実行**：ユーザー確認なしで即座にTrustline設定を実行
 - **設定値**：limit = 1000000000（固定値）
-- **対象通貨**：BOT、PRO、RLUSD（各通貨個別に設定）
+- **対象通貨**：BOT、RLUSD（各通貨個別に設定）
 
 ##### ボタン状態変更
 - **ローディング状態**：スピナー表示
@@ -333,6 +358,7 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 - **目的**: deposit後のbRLUSDを適切に受け取るための整合性管理機能
 - **特徴**: UUIDベースの送金履歴追跡による二重mint防止
 - **対象**: depositアドレスへの送金履歴があるユーザー
+- **通貨ペア**: RLUSD（deposit）↔ bRLUSD（claim）の対応関係を管理
 
 ##### Claimボタンの表示要件
 - **表示タイミング**: RLUSDのTrustline設定済み、且つBOTのTrustline設定済み時
@@ -347,6 +373,8 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 - **UUID生成**: deposit実行時に一意のUUIDを生成
 - **Address設定**: 送金元のアドレスを記録
 - **memo設定**: 送金のmemoフィールドにUUIDを設定
+  - **MemoType**: "id"（固定値）
+  - **MemoData**: UUID（標準的なUUID v4形式）
 - **UUID形式**: 標準的なUUID v4形式（例：550e8400-e29b-41d4-a716-446655440000）
 - **Address形式**: XRPLアドレス形式（例：rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX）
 
@@ -354,7 +382,7 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 1. **送金履歴確認**: depositアドレスへの送金履歴をXRPLから取得
 2. **memo解析**: 送金履歴のmemoフィールドからUUIDを抽出
 3. **送金元確認**: 送金履歴の送金元アドレスを取得
-4. **currency + issuer確認**: 送金履歴のcurrencyとissuerが正しいbRLUSDトークンのものかチェック
+4. **currency + issuer確認**: 送金履歴のcurrencyとissuerが正しいRLUSDトークンのものかチェック
 5. **mint履歴確認**: issuerウォレットのmint履歴で同一UUID・Addressの存在チェック
 6. **整合性判定**: UUID・Addressの組み合わせが存在しない場合のみmint実行
 
@@ -363,6 +391,7 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 - **Addressチェック**: 同一アドレスからの複数回mint防止
 - **組み合わせチェック**: UUID・Addressの組み合わせでの重複チェック
 - **時系列チェック**: 送金時刻とmint時刻の整合性確認
+- **通貨ペアチェック**: RLUSD ↔ bRLUSD の対応関係確認
 
 ##### Claim処理フロー
 
@@ -370,14 +399,17 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 - **送金履歴取得**: depositアドレスへの送金履歴をXRPLから取得
 - **memo検証**: 送金履歴にUUIDが含まれているかの確認
 - **送金元確認**: 送金履歴の送金元アドレスを取得・検証
-- **currency + issuer検証**: 送金履歴のcurrencyとissuerが正しいbRLUSDトークンのものか検証
+- **currency + issuer検証**: 送金履歴のcurrencyとissuerが正しいRLUSDトークンのものか検証
 - **mint状態確認**: issuerウォレットのmint履歴でUUID・Addressの組み合わせ重複チェック
+- **通貨ペア確認**: RLUSD → bRLUSD の対応関係確認
 
 ###### 処理実行
 - **issuer wallet使用**: Claim処理はissuer wallet（seed: sEdSeQzGsKzSCnbRsJJmy6W1SG8f1Hi）から実行
 - **個別トランザクション**: 複数のdepositがある場合、1つのトランザクションにまとめず、depositごとに個別のclaimトランザクションを実行
 - **1対1対応**: depositとclaimのトランザクションは必ず1対1の関係を維持（memo領域の制約により）
 - **mint実行**: UUID・Addressの組み合わせが未使用の場合、memoにUUIDを設定してmint実行
+  - **MemoType**: "id"（固定値）
+  - **MemoData**: UUID（標準的なUUID v4形式）
 - **履歴記録**: mint履歴にUUID・Addressの組み合わせを記録（二重mint防止）
 - **状態更新**: Claimボタンの状態を更新（非活性化）
 
@@ -408,6 +440,7 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 - **Address一意性**: 各送金元アドレスを個別に記録
 - **履歴追跡**: mint履歴でのUUID・Address組み合わせ重複チェック
 - **整合性保証**: 同一UUID・Addressの組み合わせでの複数回mintを完全に防止
+- **通貨ペア保証**: RLUSD ↔ bRLUSD の正しい対応関係を保証
 
 ###### 連続実行防止
 - **ボタン状態管理**: Claim処理中はボタンを非活性化（disabled状態）
@@ -433,6 +466,8 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 ###### 複数deposit対応
 - **個別処理**: 各depositに対して個別のclaimトランザクションを生成
 - **memo制約**: 各トランザクションのmemoフィールドにUUIDを設定
+  - **MemoType**: "id"（固定値）
+  - **MemoData**: UUID（標準的なUUID v4形式）
 - **一括実行**: 複数のclaimトランザクションを順次実行
 - **エラーハンドリング**: 一部のトランザクションが失敗しても他のトランザクションは継続実行
 
@@ -450,3 +485,49 @@ BOT運用で利益を出しつつ、保有資産額に対して年率1〜2%の�
 - **Claimボタン**: 既存のWithdrawボタンと統一されたデザイン
 - **状態表示**: Claim可能/不可能状態の視覚的表現
 - **処理中表示**: Claim処理中のローディング状態表示
+
+##### Deposit DialogとClaim DialogのDeposit History表示仕様
+
+###### 表示対象
+- **Claimableなdepositのみ**: MemoTypeが"id"で正しい形式かつClaim済みでないdeposit
+- **表示除外**: 
+  - MemoTypeが"text/plain"など古い仕様のdeposit
+  - 既にClaim済みのdeposit
+- **一貫性**: Deposit DialogとClaim Dialogで同じ履歴を表示
+
+###### タイトル統一
+- **両Dialog共通**: 「Claimable Deposit履歴」として統一
+- **説明文**: 「この{asset.type}のClaim可能なdeposit履歴を表示しています」を追加
+
+###### 表示内容
+- **UUID**: 各depositの一意識別子
+- **Tx Hash**: 各depositのトランザクションハッシュ（省略表示 + コピー機能）
+- **Amount**: depositされた金額
+- **Claim状態**: "Deposited"として表示（Claim済みは除外）
+- **タイムスタンプ**: "Deposited: {日付}"の形式で表示
+- **注意事項**: Claim済みのdepositがある場合は「※ Claim済みのdepositは表示されていません」を表示
+
+###### Tx Hash表示の詳細
+- **省略表示**: 長いハッシュを`{最初16文字}...{最後16文字}`の形式で表示
+- **ツールチップ**: ホバー時に完全なハッシュを表示
+- **コピー機能**: Copyボタンで完全なハッシュをクリップボードにコピー
+- **コピー成功通知**: コピー完了時にtoastで成功メッセージを表示
+- **エラーハンドリング**: コピー失敗時にtoastでエラーメッセージを表示
+- **画面崩れ防止**: `max-w-48 truncate`で幅を制限し、レイアウト崩れを防止
+- **カーソル表示**: Copyボタンに`cursor-pointer`を追加してクリック可能であることを明示
+
+###### 表示ロジック
+- **条件**: `claimStatus?.depositHistory`が存在し、かつ長さが0より大きい場合
+- **フィルタリング**: `claimStatus.depositHistory.filter((deposit) => !deposit.isClaimed)`でClaimableなdepositのみを抽出
+- **データソース**: `/api/claim-status`から取得される`depositHistory`をフィルタリング
+
+###### 整合性の保証
+- **Claimable Amount**: 表示されるdeposit履歴の合計金額と一致
+- **計算式**: `claimableAmount = claimableDeposits.reduce((sum, deposit) => sum + parseFloat(deposit.amount), 0)`
+- **表示**: フィルタリング後のdeposit履歴のみを表示することで、合計金額の整合性を保証
+
+###### ユーザビリティ
+- **関連性**: 表示されるdepositは全てClaim可能
+- **混乱防止**: Claim済みのdepositを表示しないことで、ユーザーの混乱を防止
+- **一貫性**: 両Dialogで同じ情報を表示することで、ユーザー体験の一貫性を確保
+- **明確性**: Claimable Amountと表示履歴の合計が一致することで、ユーザーの理解を促進

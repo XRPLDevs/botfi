@@ -10,6 +10,7 @@ import type {
 import { useTrustline } from '@/hooks/useTrustline';
 import { useClaimStatus } from '@/hooks/useClaimStatus';
 import { getPrimaryTokenConfigs } from '@/lib/constants';
+import { PRIMARY_TOKENS } from '@/lib/constants';
 
 type TrustlineCheckerProps = {
   children: (
@@ -22,19 +23,23 @@ type TrustlineCheckerProps = {
 };
 
 export function TrustlineChecker({ children }: TrustlineCheckerProps) {
-  const { data: trustlineData, isLoading: trustlineLoading, error: trustlineError } = useTrustline();
+  const {
+    data: trustlineData,
+    isLoading: trustlineLoading,
+    error: trustlineError,
+  } = useTrustline();
   const { data: claimData, isLoading: claimLoading, error: claimError } = useClaimStatus();
 
   // APIレスポンスの配列データをTrustlineStatusオブジェクトに変換
   const trustlineStatus: TrustlineStatus | null = trustlineData
     ? (() => {
         const status: TrustlineStatus = {} as TrustlineStatus;
-        const primaryTokens = getPrimaryTokenConfigs();
-
         // 各主要トークンのtrustline状態を設定
-        primaryTokens.forEach(({ currency }) => {
-          const trustline = trustlineData.find((t: TrustlineResponse) => t.displayCurrency === currency);
-          status[currency] = trustline?.isTrust || false;
+        PRIMARY_TOKENS.forEach((tokenName) => {
+          const trustline = trustlineData.find(
+            (t: TrustlineResponse) => t.displayCurrency === tokenName
+          );
+          status[tokenName] = trustline?.isTrust || false;
         });
 
         return status;
@@ -45,11 +50,12 @@ export function TrustlineChecker({ children }: TrustlineCheckerProps) {
   const trustlineStatusWithBalance: TrustlineStatusWithBalance | null = trustlineData
     ? (() => {
         const status: TrustlineStatusWithBalance = {} as TrustlineStatusWithBalance;
-        const primaryTokens = getPrimaryTokenConfigs();
-
-        primaryTokens.forEach(({ currency }) => {
-          const trustline = trustlineData.find((t: TrustlineResponse) => t.displayCurrency === currency);
-          status[currency] = {
+        // 残高情報も含むTrustlineStatusWithBalanceを生成
+        PRIMARY_TOKENS.forEach((tokenName) => {
+          const trustline = trustlineData.find(
+            (t: TrustlineResponse) => t.displayCurrency === tokenName
+          );
+          status[tokenName] = {
             hasTrustline: trustline?.isTrust || false,
             balance: parseFloat(trustline?.balance || '0'),
           };
@@ -63,12 +69,10 @@ export function TrustlineChecker({ children }: TrustlineCheckerProps) {
   const claimStatus: ClaimStatus | null = claimData
     ? (() => {
         const status: ClaimStatus = {} as ClaimStatus;
-        const primaryTokens = getPrimaryTokenConfigs();
-
         // 各主要トークンのClaim可能状態を設定
-        primaryTokens.forEach(({ currency }) => {
-          const claimInfo = claimData.find((c: ClaimStatusResponse) => c.currency === currency);
-          status[currency] = claimInfo || null;
+        PRIMARY_TOKENS.forEach((tokenName) => {
+          const claimInfo = claimData.find((c: ClaimStatusResponse) => c.currency === tokenName);
+          status[tokenName] = claimInfo || null;
         });
 
         return status;
@@ -80,6 +84,14 @@ export function TrustlineChecker({ children }: TrustlineCheckerProps) {
   const error = trustlineError || claimError;
 
   return (
-    <>{children(trustlineStatus, trustlineStatusWithBalance, claimStatus, isLoading, error?.message || null)}</>
+    <>
+      {children(
+        trustlineStatus,
+        trustlineStatusWithBalance,
+        claimStatus,
+        isLoading,
+        error?.message || null
+      )}
+    </>
   );
 }

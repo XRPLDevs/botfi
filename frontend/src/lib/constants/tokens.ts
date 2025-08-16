@@ -1,64 +1,86 @@
-// トークン関連の定数を一元管理
+// ============================================================================
+// Token-related constants centralized management
+// ============================================================================
+
+// Basic definitions
 export const TOKENS = {
-  BRLUSD: 'bRLUSD',
-  PRO: 'PRO',
-  RLUSD: 'RLUSD',
+  BRLUSD: 'bRLUSD', // BotFi issued stablecoin
+  RLUSD: 'RLUSD', // Ripple issued stablecoin
 } as const;
 
-// トークン名の型定義
 export type TokenName = (typeof TOKENS)[keyof typeof TOKENS];
 
-// 発行者アドレスの定数
+// Issuer and address information
 export const ISSUERS = {
-  [TOKENS.BRLUSD]: 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU',
-  [TOKENS.PRO]: 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU',
-  [TOKENS.RLUSD]: 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV',
+  [TOKENS.BRLUSD]: 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU', // BotFi issuer address
+  [TOKENS.RLUSD]: 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV', // Ripple issuer address
 } as const;
 
-// deposit addressの定数
-export const DEPOSIT_ADDRESS = 'rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x';
+export const DEPOSIT_ADDRESS = 'rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x'; // RLUSD receiving address from users
+export const DEPOSIT_WALLET = 'rnjyMRQTM2eYJcrjm1hXdfaUY6vhjAk4pC'; // Deposit management wallet
 
-// 表示名の定数
+// Currency codes and display information
+export const CURRENCY_CODES = {
+  [TOKENS.BRLUSD]: '62524C5553440000000000000000000000000000', // bRLUSD (b + RLUSD)
+  [TOKENS.RLUSD]: '524C555344000000000000000000000000000000', // RLUSD (RLUSD)
+} as const;
+
+export const DISPLAY_CURRENCY_CODES = {
+  [TOKENS.BRLUSD]: 'bRLUSD',
+  [TOKENS.RLUSD]: 'RLUSD',
+} as const;
+
+// Currency pair correspondence (RLUSD ↔ bRLUSD)
+export const CURRENCY_PAIRS = {
+  [CURRENCY_CODES[TOKENS.RLUSD]]: CURRENCY_CODES[TOKENS.BRLUSD], // RLUSD → bRLUSD
+  [CURRENCY_CODES[TOKENS.BRLUSD]]: CURRENCY_CODES[TOKENS.RLUSD], // bRLUSD → RLUSD
+} as const;
+
+// Display and description information
 export const DISPLAY_NAMES = {
   [TOKENS.BRLUSD]: 'bRLUSD',
-  [TOKENS.PRO]: 'PRO',
   [TOKENS.RLUSD]: 'RLUSD',
 } as const;
 
-// 説明文の定数
 export const DESCRIPTIONS = {
-  [TOKENS.BRLUSD]: 'bRLUSD Token',
-  [TOKENS.PRO]: 'PRO',
-  [TOKENS.RLUSD]: 'RLUSD',
+  [TOKENS.BRLUSD]: 'BotFi issued stablecoin',
+  [TOKENS.RLUSD]: 'Ripple issued stablecoin',
 } as const;
 
-// 主要トークンの配列（Trustline設定対象）- bRLUSD、RLUSDを表示（PROは除外）
+// Trustline settings
+export const TRUSTLINE_LIMITS = {
+  [TOKENS.BRLUSD]: '1000000000',
+  [TOKENS.RLUSD]: '1000000000',
+} as const;
+
+export const DEFAULT_TRUSTLINE_LIMIT = '1000000000';
+
+// Primary tokens array (Trustline setting targets)
 export const PRIMARY_TOKENS: readonly TokenName[] = [TOKENS.BRLUSD, TOKENS.RLUSD] as const;
 
-// トークン設定の取得関数
+// ============================================================================
+// Configuration retrieval functions
+// ============================================================================
+
 export function getTokenConfig(tokenName: TokenName) {
   return {
-    currency: tokenName,
+    currency: CURRENCY_CODES[tokenName], // Encoded currency code
+    displayCurrency: DISPLAY_CURRENCY_CODES[tokenName], // Decoded currency code
     issuer: ISSUERS[tokenName],
     displayName: DISPLAY_NAMES[tokenName],
     description: DESCRIPTIONS[tokenName],
+    trustlineLimit: TRUSTLINE_LIMITS[tokenName], // Trustline Limit
+    rawCurrency: tokenName,
   };
 }
 
-// 全トークン設定の取得
-export function getAllTokenConfigs() {
-  return Object.values(TOKENS).map(getTokenConfig);
-}
+export const getBRLUSDConfig = () => getTokenConfig(TOKENS.BRLUSD);
+export const getRLUSDConfig = () => getTokenConfig(TOKENS.RLUSD);
+export const getPrimaryTokenConfigs = () => PRIMARY_TOKENS.map(getTokenConfig);
 
-// 主要トークン設定の取得
-export function getPrimaryTokenConfigs() {
-  return PRIMARY_TOKENS.map(getTokenConfig);
-}
+// ============================================================================
+// Utility functions
+// ============================================================================
 
-// 特定のトークン設定の取得（存在チェック付き）
-export function getTokenConfigSafe(tokenName: string) {
-  if (Object.values(TOKENS).includes(tokenName as TokenName)) {
-    return getTokenConfig(tokenName as TokenName);
-  }
-  return null;
-}
+export const isCorrespondingCurrency = (depositCurrency: string, mintCurrency: string): boolean =>
+  CURRENCY_PAIRS[depositCurrency as keyof typeof CURRENCY_PAIRS] === mintCurrency;

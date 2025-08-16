@@ -86,6 +86,9 @@ export type ClaimStatusResponse = {
     timestamp: string;
     fromAddress: string;
     isClaimed: boolean;
+    txHash: string;
+    mintStatus?: string;
+    mintTxHash?: string;
   }>;
   totalDeposited: string;
   totalClaimed: string;
@@ -95,15 +98,23 @@ export type ClaimStatus = {
   [K in AssetType]: ClaimStatusResponse | null;
 };
 
-// Claim用の型定義
+// Claim用の型定義（簡素化）
 export type ClaimRequest = {
   deposits: Array<{
-    currency: string;
-    issuer: string;
-    amount: string;
-    uuid: string; // UUID for consistency check
+    uuid: string; // UUIDのみ必要
     userAddress: string; // ユーザーのアドレス
   }>;
+};
+
+// API側で検証済みのDeposit情報
+export type ValidatedDepositInfo = {
+  uuid: string;
+  amount: string;
+  currency: string;
+  issuer: string;
+  destination: string;
+  userAddress: string;
+  txHash: string;
 };
 
 export type ClaimResult = {
@@ -122,7 +133,14 @@ export type ClaimResponse = BaseApiResponse & {
   failedClaims?: number;
   results?: ClaimResult[];
   errors?: ClaimResult[];
-  error?: 'Claim is already being processed' | 'Invalid input data' | 'Authentication required' | 'All claim transactions failed' | 'Transaction submission failed' | 'Internal server error' | string;
+  error?:
+    | 'Claim is already being processed'
+    | 'Invalid input data'
+    | 'Authentication required'
+    | 'All claim transactions failed'
+    | 'Transaction submission failed'
+    | 'Internal server error'
+    | string;
 };
 
 export type AssetTableViewProps = {
