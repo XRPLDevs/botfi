@@ -18,7 +18,7 @@ export type TokenName = (typeof TOKENS)[keyof typeof TOKENS];
 
 // Issuer and address information
 export const ISSUERS = {
-  [TOKENS.BRLUSD]: BRLUSD_ISSUER_ADDRESS || 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU', // BotFi issuer address
+  [TOKENS.BRLUSD]: BRLUSD_ISSUER_ADDRESS || 'rm2FabxuAxQWWmrYnTn1rQnmPmyLee4gB', // BotFi issuer address
   [TOKENS.RLUSD]: RLUSD_ISSUER_ADDRESS || 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV', // Ripple issuer address from env
 } as const;
 
