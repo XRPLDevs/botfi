@@ -5,7 +5,8 @@
 // Environment variables
 const RLUSD_ISSUER_ADDRESS = process.env.NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS;
 const BRLUSD_ISSUER_ADDRESS = process.env.NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS;
-export const DEPOSIT_ADDRESS = process.env.NEXT_PUBLIC_DEPOSIT_ADDRESS || 'rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x' // RLUSD receiving address from users
+export const DEPOSIT_ADDRESS =
+  process.env.NEXT_PUBLIC_DEPOSIT_ADDRESS || 'rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x'; // RLUSD receiving address from users
 
 // Basic definitions
 export const TOKENS = {

@@ -11,8 +11,12 @@ const envSchema = z.object({
   // Issuer Wallet設定
   BRLUSD_ISSUER_SEED: z.string().min(1, 'BRLUSD_ISSUER_SEED is required'),
 
-  NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS is required'),
-  NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS is required'),
+  NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS: z
+    .string()
+    .min(1, 'NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS is required'),
+  NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS: z
+    .string()
+    .min(1, 'NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS is required'),
   NEXT_PUBLIC_DEPOSIT_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_DEPOSIT_ADDRESS is required'),
   NEXT_PUBLIC_WITHDRAW_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_WITHDRAW_ADDRESS is required'),
   NEXT_PUBLIC_TRADE_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_TRADE_ADDRESS is required'),

@@ -1,11 +1,30 @@
-export default function RootLayout({ children }: Readonly<{
-  children: React.ReactNode
+import type { Metadata } from 'next';
+import { Noto_Sans } from 'next/font/google';
+import Topbar from '@/app/(docs)/_components/topbar';
+import '@/app/(docs)/globals.css';
+
+const notoSans = Noto_Sans({
+  variable: '--font-noto-sans',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+});
+
+export const metadata: Metadata = {
+  title: 'BotFi',
+  description: 'BotFi is a platform for creating and managing your own bots on the XRPL.',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <body className={`${notoSans.variable} antialiased`}>
+        <Topbar />
         {children}
       </body>
     </html>
-  )
+  );
 }
