@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Noto_Sans } from 'next/font/google';
 import Topbar from '@/app/(docs)/_components/topbar';
+import { ThemeProvider } from '@/app/(app)/_providers/theme-provider';
 import '@/app/(docs)/globals.css';
 
 const notoSans = Noto_Sans({
@@ -22,8 +23,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${notoSans.variable} antialiased`}>
-        <Topbar />
-        {children}
+        <ThemeProvider>
+          <Topbar />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
