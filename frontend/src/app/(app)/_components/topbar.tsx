@@ -9,7 +9,7 @@ export default function Topbar() {
     <header className="fixed flex justify-between px-8 w-screen h-16 items-center border-b border-gray-300">
       <h1 className="font-bold text-2xl">BotFi</h1>
       <div className="flex gap-3">
-        {appStatus === 'developing' && <WalletConnectButton walletType={WalletTypes.XAMAN} className="cursor-pointer" />}
+        {appStatus !== 'developing' && <WalletConnectButton walletType={WalletTypes.XAMAN} className="cursor-pointer" />}
         <ThemeDropdown />
       </div>
     </header>
