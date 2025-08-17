@@ -2,14 +2,20 @@ import { z } from 'zod';
 
 // 環境変数のスキーマ定義
 const envSchema = z.object({
+  // 環境設定
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+
   // XRPL設定
   XRPL_NODE_URL: z.string().url().default('wss://s.altnet.rippletest.net:51233'),
 
   // Issuer Wallet設定
-  ISSUER_WALLET_SEED: z.string().min(1, 'ISSUER_WALLET_SEED is required'),
+  BRLUSD_ISSUER_SEED: z.string().min(1, 'BRLUSD_ISSUER_SEED is required'),
 
-  // 環境設定
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS is required'),
+  NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS is required'),
+  NEXT_PUBLIC_DEPOSIT_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_DEPOSIT_ADDRESS is required'),
+  NEXT_PUBLIC_WITHDRAW_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_WITHDRAW_ADDRESS is required'),
+  NEXT_PUBLIC_TRADE_ADDRESS: z.string().min(1, 'NEXT_PUBLIC_TRADE_ADDRESS is required'),
 });
 
 // 環境変数の検証と型安全な取得

@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { encodeUuid } from '@/utils/uuid';
 import { ENCODED_MEMO_TYPE_ID } from '@/utils/memo-validation';
@@ -14,7 +13,6 @@ import {
   validateTransactionIntegrity,
   isTransactionSuccessful,
 } from '@/lib/transaction-validation';
-import { getBRLUSDConfig } from '@/lib/constants/tokens';
 
 // Claim用のスキーマ（簡素化）
 const ClaimSchema = z.object({
@@ -177,7 +175,7 @@ export async function POST(request: Request) {
 
       // XRPL WalletとClientの初期化
       const { Wallet, Client } = await import('xrpl');
-      const issuerWallet = Wallet.fromSeed(env.ISSUER_WALLET_SEED);
+      const issuerWallet = Wallet.fromSeed(env.BRLUSD_ISSUER_SEED);
       const client = new Client(env.XRPL_NODE_URL);
 
       logger.info('Processing claim transactions', {
