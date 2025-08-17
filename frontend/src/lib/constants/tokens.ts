@@ -2,6 +2,11 @@
 // Token-related constants centralized management
 // ============================================================================
 
+// Environment variables
+const RLUSD_ISSUER_ADDRESS = process.env.NEXT_PUBLIC_RLUSD_ISSUER_ADDRESS;
+const BRLUSD_ISSUER_ADDRESS = process.env.NEXT_PUBLIC_BRLUSD_ISSUER_ADDRESS;
+export const DEPOSIT_ADDRESS = process.env.NEXT_PUBLIC_DEPOSIT_ADDRESS || 'rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x' // RLUSD receiving address from users
+
 // Basic definitions
 export const TOKENS = {
   BRLUSD: 'bRLUSD', // BotFi issued stablecoin
@@ -12,12 +17,9 @@ export type TokenName = (typeof TOKENS)[keyof typeof TOKENS];
 
 // Issuer and address information
 export const ISSUERS = {
-  [TOKENS.BRLUSD]: 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU', // BotFi issuer address
-  [TOKENS.RLUSD]: 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV', // Ripple issuer address
+  [TOKENS.BRLUSD]: BRLUSD_ISSUER_ADDRESS || 'rUbvHHDLhJkTA1u6XgPKoPGYSVQwrU6jhU', // BotFi issuer address
+  [TOKENS.RLUSD]: RLUSD_ISSUER_ADDRESS || 'rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV', // Ripple issuer address from env
 } as const;
-
-export const DEPOSIT_ADDRESS = 'rf9yPn8HtzHTrTB1TyiWzQZtwHA6Huve4x'; // RLUSD receiving address from users
-export const DEPOSIT_WALLET = 'rnjyMRQTM2eYJcrjm1hXdfaUY6vhjAk4pC'; // Deposit management wallet
 
 // Currency codes and display information
 export const CURRENCY_CODES = {
@@ -54,6 +56,11 @@ export const TRUSTLINE_LIMITS = {
 } as const;
 
 export const DEFAULT_TRUSTLINE_LIMIT = '1000000000';
+
+// Constraints (moved from common.ts)
+export const CONSTRAINTS = {
+  BRLUSD_TRUSTLINE_LIMIT: Number(TRUSTLINE_LIMITS.bRLUSD),
+} as const;
 
 // Primary tokens array (Trustline setting targets)
 export const PRIMARY_TOKENS: readonly TokenName[] = [TOKENS.BRLUSD, TOKENS.RLUSD] as const;

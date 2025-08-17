@@ -3,13 +3,13 @@ import RefreshButtonContainer from '@/app/(app)/_containers/refresh-button/conta
 import WalletConnectMessageContainer from '@/app/(app)/_containers/wallet-connect-message/container';
 import Link from 'next/link';
 
-const isProd = process.env.NODE_ENV === 'production'
+const appStatus = process.env.NEXT_PUBLIC_APP_STATUS
 
 export default function Home() {
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        {isProd && (
+        {appStatus === 'developing' && (
           <div className="flex flex-col gap-4 w-full">
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <h2 className="text-3xl font-bold text-foreground mb-2">Coming Soon</h2>
@@ -31,7 +31,7 @@ export default function Home() {
             </div>
           </div>
         )}
-        {!isProd && (
+        {appStatus !== 'developing' && (
           <WalletConnectMessageContainer>
             <div className="flex flex-col gap-4 w-full">
               <div className="flex justify-end">

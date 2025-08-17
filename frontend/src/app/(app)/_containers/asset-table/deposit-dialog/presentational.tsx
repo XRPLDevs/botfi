@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BaseDialog, BaseDialogFooter } from '@/components/ui/base-dialog';
 import { AmountInput, ConfirmationInfo } from '@/components/ui/form-fields';
 import { useFormDataApiCall } from '@/hooks/useApiCall';
-import { DEPOSIT_ADDRESS, CONSTRAINTS } from '@/lib/constants';
+import { DEPOSIT_ADDRESS, CONSTRAINTS } from '@/lib/constants/tokens';
 import type { AssetInfo, TransactionInput } from '../types';
 
 type DepositDialogProps = {

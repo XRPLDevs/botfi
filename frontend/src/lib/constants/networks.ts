@@ -1,4 +1,4 @@
-import { ISSUERS, DEPOSIT_WALLET } from './tokens';
+import { ISSUERS } from './tokens';
 
 // ネットワーク設定の定数
 export const NETWORKS = {
@@ -14,7 +14,6 @@ export function getNetworkConfig(_network: NetworkType) {
   return {
     BRLUSD_ISSUER: ISSUERS.bRLUSD,
     RLUSD_ISSUER: ISSUERS.RLUSD,
-    DEPOSIT_WALLET,
   };
 }
 
@@ -40,5 +39,5 @@ export const NETWORK_URLS = {
 // ネットワーク設定の検証関数
 export function validateNetworkConfig(network: NetworkType): boolean {
   const config = getNetworkConfig(network);
-  return !!(config.BRLUSD_ISSUER && config.RLUSD_ISSUER && config.DEPOSIT_WALLET);
+  return !!(config.BRLUSD_ISSUER && config.RLUSD_ISSUER);
 }

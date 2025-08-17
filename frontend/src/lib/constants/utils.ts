@@ -1,6 +1,5 @@
 import { NETWORKS } from './networks';
-import { TOKENS } from './tokens';
-import { CONSTRAINTS } from './common';
+import { TOKENS, CONSTRAINTS } from './tokens';
 
 /**
  * Common function to validate configuration integrity
