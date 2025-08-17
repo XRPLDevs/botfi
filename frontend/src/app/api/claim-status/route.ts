@@ -124,7 +124,7 @@ export async function GET(request: Request, _context: { params: Promise<Record<s
     logger.info('JWT validation successful', { address });
 
     // XRPLからトランザクション履歴を取得してClaim可能状態を判定
-    const xrplClient = new XRPLClient(jwtData.network_endpoint);
+    const xrplClient = new XRPLClient(); // 環境変数から自動的にネットワークを選択
 
     // 1. ユーザーの送金履歴を取得（成功したトランザクションのみを取得）
     const userTransactions = await xrplClient.requestAccountTx(address, 200);

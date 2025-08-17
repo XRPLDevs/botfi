@@ -7,7 +7,6 @@ import {
   validateJwt,
   createErrorResponse,
   createSuccessResponse,
-  ApiLogger,
 } from '@/lib/api-utils';
 
 // レスポンス用の型定義
@@ -31,7 +30,7 @@ export async function GET(request: Request, _context: { params: Promise<Record<s
     const { address, jwtData } = jwtValidation;
 
     // XRPLクライアントの初期化
-    const xrplClient = new XRPLClient(jwtData.network_endpoint);
+    const xrplClient = new XRPLClient(); // 環境変数から自動的にネットワークを選択
 
     // アカウントのtrustline情報を取得
     const accountLines = await xrplClient.requestAccountLines(address);

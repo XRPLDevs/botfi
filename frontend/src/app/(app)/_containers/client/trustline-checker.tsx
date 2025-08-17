@@ -9,7 +9,6 @@ import type {
 } from '@/app/(app)/_containers/asset-table/types';
 import { useTrustline } from '@/hooks/useTrustline';
 import { useClaimStatus } from '@/hooks/useClaimStatus';
-import { getPrimaryTokenConfigs } from '@/lib/constants';
 import { PRIMARY_TOKENS } from '@/lib/constants';
 
 type TrustlineCheckerProps = {

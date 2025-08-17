@@ -6,8 +6,8 @@ This project requires several environment variables to be set. Create a `.env.lo
 
 ```bash
 # XRPL設定
-# XRPLノードのWebSocket URL
-XRPL_NODE_URL=wss://s.altnet.rippletest.net:51233
+# ネットワーク選択（mainnet, testnet, devnet）
+NETWORK=testnet
 
 # Issuer Wallet設定
 # bRLUSDのissuer walletのseed（本番環境では必ず変更してください）

@@ -78,11 +78,13 @@ export async function setTrustline(_: unknown, formData: FormData): Promise<Trus
     // 通貨コードをXRPL用に16進数エンコード
     const encodedCurrency = encodeCurrencyCode(parsed.data.currency);
 
+    const noRippleFlag = 131072
+
     // トラストライン設定トランザクションのペイロードを作成
     const payload = {
       txjson: {
         TransactionType: 'TrustSet',
-        Flags: 0,
+        Flags: noRippleFlag,
         LimitAmount: {
           currency: encodedCurrency,
           issuer: parsed.data.issuer,

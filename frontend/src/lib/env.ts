@@ -5,8 +5,8 @@ const envSchema = z.object({
   // 環境設定
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
-  // XRPL設定
-  XRPL_NODE_URL: z.string().url().default('wss://s.altnet.rippletest.net:51233'),
+  // ネットワーク設定
+  NETWORK: z.enum(['mainnet', 'testnet', 'devnet']).default('testnet'),
 
   // Issuer Wallet設定
   BRLUSD_ISSUER_SEED: z.string().min(1, 'BRLUSD_ISSUER_SEED is required'),

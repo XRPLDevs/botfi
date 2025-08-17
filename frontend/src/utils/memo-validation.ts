@@ -21,211 +21,139 @@ export interface MemoValidationResult {
  */
 export function validateMemo(
   memo: any,
-  expectedMemoType: string = ENCODED_MEMO_TYPE_ID,
-  logger?: ApiLogger
+  expectedMemoType: string,
+  logger: ApiLogger
 ): MemoValidationResult {
   try {
     // Memoオブジェクトの存在確認
     if (!memo) {
-      if (logger) {
-        logger.debug('Memo validation failed: Memo object not found');
-      }
       return {
         isValid: false,
         error: 'Memo object not found',
+        uuid: undefined,
       };
-    }
-
-    // Debug: Memoオブジェクトの構造をログ出力
-    if (logger) {
-      logger.debug('Memo validation started:', {
-        memo: memo,
-        memoType: memo.MemoType,
-        memoData: memo.MemoData,
-        memoFormat: memo.MemoFormat,
-        expectedMemoType: expectedMemoType,
-      });
     }
 
     // MemoTypeの存在確認
     if (!memo.MemoType) {
-      if (logger) {
-        logger.debug('Memo validation failed: MemoType not found');
-      }
       return {
         isValid: false,
         error: 'MemoType not found',
+        uuid: undefined,
       };
     }
 
-    // MemoTypeの検証（エンコードされた値と直接比較）
+    // MemoTypeのデコードと検証
     let decodedMemoType: string;
-    let isEncodedExpected: boolean;
-
     try {
-      decodedMemoType = decodeMemoType(memo.MemoType);
-      if (logger) {
-        logger.debug('MemoType decoded successfully:', {
-          encoded: memo.MemoType,
-          decoded: decodedMemoType,
-        });
-      }
-
-      // 期待される値がエンコードされた値かどうかを判定
-      isEncodedExpected = expectedMemoType === ENCODED_MEMO_TYPE_ID;
-
-      if (isEncodedExpected) {
-        // エンコードされた値が期待される場合、直接比較
-        if (memo.MemoType !== expectedMemoType) {
-          if (logger) {
-            logger.debug('MemoType mismatch detected (encoded comparison):', {
-              actual: memo.MemoType,
-              expected: expectedMemoType,
-              decoded: decodedMemoType,
-            });
-          }
-          return {
-            isValid: false,
-            memoType: decodedMemoType,
-            error: `MemoType mismatch: expected "${expectedMemoType}", got "${memo.MemoType}"`,
-          };
-        }
-      } else {
-        // 文字列が期待される場合、デコード後の値と比較
-        if (decodedMemoType !== expectedMemoType) {
-          if (logger) {
-            logger.debug('MemoType mismatch detected (decoded comparison):', {
-              actual: decodedMemoType,
-              expected: expectedMemoType,
-              encoded: memo.MemoType,
-            });
-          }
-          return {
-            isValid: false,
-            memoType: decodedMemoType,
-            error: `MemoType mismatch: expected "${expectedMemoType}", got "${decodedMemoType}"`,
-          };
-        }
-      }
+      decodedMemoType = Buffer.from(memo.MemoType, 'hex').toString();
     } catch (error) {
-      if (logger) {
-        logger.debug('MemoType decode failed:', {
-          encoded: memo.MemoType,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
       return {
         isValid: false,
-        error: `Failed to decode MemoType: ${memo.MemoType}`,
+        error: `Failed to decode MemoType: ${error}`,
+        uuid: undefined,
+      };
+    }
+
+    // MemoTypeの比較（デコードされた値で比較）
+    if (decodedMemoType !== expectedMemoType) {
+      return {
+        isValid: false,
+        error: `MemoType mismatch. Expected: "${expectedMemoType}", Got: "${decodedMemoType}"`,
+        uuid: undefined,
       };
     }
 
     // MemoDataの存在確認
     if (!memo.MemoData) {
-      if (logger) {
-        logger.debug('Memo validation failed: MemoData not found');
-      }
       return {
         isValid: false,
-        memoType: decodedMemoType,
         error: 'MemoData not found',
+        uuid: undefined,
       };
     }
 
-    // UUIDのデコードと検証
+    // MemoDataからUUIDを抽出
     let uuid: string;
     try {
-      uuid = decodeUuid(memo.MemoData);
-      if (logger) {
-        logger.debug('UUID decoded successfully:', {
-          encoded: memo.MemoData,
-          decoded: uuid,
-        });
-      }
-
-      if (!isValidUuid(uuid)) {
-        if (logger) {
-          logger.debug('UUID validation failed: Invalid UUID format', {
-            uuid: uuid,
-          });
-        }
-        return {
-          isValid: false,
-          memoType: decodedMemoType,
-          error: 'Invalid UUID format in MemoData',
-        };
-      }
+      uuid = Buffer.from(memo.MemoData, 'hex').toString();
     } catch (error) {
-      if (logger) {
-        logger.debug('UUID decode failed:', {
-          encoded: memo.MemoData,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
       return {
         isValid: false,
-        memoType: decodedMemoType,
-        error: `Failed to decode UUID from MemoData: ${memo.MemoData}`,
+        error: `Failed to decode MemoData: ${error}`,
+        uuid: undefined,
       };
     }
 
-    // 正常な場合
-    if (logger) {
-      logger.debug('Memo validation completed successfully:', {
-        memoType: decodedMemoType,
-        uuid: uuid,
-        expectedMemoType: expectedMemoType,
-      });
+    // UUIDの形式検証
+    if (!isValidUUID(uuid)) {
+      return {
+        isValid: false,
+        error: `Invalid UUID format: ${uuid}`,
+        uuid: undefined,
+      };
     }
 
+    // 成功
     return {
       isValid: true,
+      error: undefined,
       uuid,
-      memoType: decodedMemoType,
     };
   } catch (error) {
-    if (logger) {
-      logger.debug('Unexpected error during memo validation:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        memo: memo,
-      });
-    }
     return {
       isValid: false,
-      error: `Unexpected error during memo validation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Unexpected error during memo validation: ${error}`,
+      uuid: undefined,
     };
   }
 }
 
-/**
- * トランザクションから特定のUUIDを持つ有効なMemoを検索
- * @param transactions - XRPLトランザクションの配列
- * @param targetUuid - 検索対象のUUID
- * @param expectedMemoType - 期待されるMemoType（例: "id"）
- * @param logger - ログ出力用のApiLogger
- * @returns 見つかったトランザクション、またはnull
- */
-export function findTransactionByUuid(
+// UUIDの形式検証
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+// トランザクション配列からUUIDで検索
+export async function findTransactionByUuid(
   transactions: any[],
-  targetUuid: string,
-  expectedMemoType: string = 'id',
-  logger?: ApiLogger
-): any | null {
-  return transactions.find((tx: any) => {
-    const txJson = tx.tx_json;
-    const memo = txJson.Memos?.[0]?.Memo;
+  uuid: string,
+  expectedMemoType: string,
+  logger: ApiLogger
+): Promise<any | null> {
+  try {
+    let checkedCount = 0;
 
-    if (!memo) {
-      return false;
+    for (const tx of transactions) {
+      checkedCount++;
+
+      // Memoの存在確認
+      const memos = tx.tx_json?.Memos;
+      if (!memos || memos.length === 0) {
+        continue;
+      }
+
+      // 各Memoをチェック
+      for (const memoWrapper of memos) {
+        const memo = memoWrapper.Memo;
+        if (!memo) {
+          continue;
+        }
+
+        // Memoの検証
+        const validation = validateMemo(memo, expectedMemoType, logger);
+        if (validation.isValid && validation.uuid === uuid) {
+          return tx;
+        }
+      }
     }
 
-    const validation = validateMemo(memo, expectedMemoType, logger);
-    if (!validation.isValid) {
-      return false;
-    }
-
-    return validation.uuid === targetUuid;
-  });
+    return null;
+  } catch (error) {
+    logger.error('Error during UUID search', error);
+    return null;
+  }
 }
 
 /**
@@ -257,6 +185,10 @@ export function filterTransactionsByValidMemo(
           txHash: tx.hash,
         });
       }
+      return false;
+    }
+
+    if (!logger) {
       return false;
     }
 

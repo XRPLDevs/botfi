@@ -147,35 +147,21 @@ export async function validateTransactionIntegrity(
   xrplClient: any
 ) {
   try {
-    logger.info('Starting transaction integrity validation', { uuid: deposit.uuid, address });
+    // 0. depositトランザクションの正しいアドレスを確認
 
     // 1. 送金履歴の存在確認（共通関数を使用）
-    const userTransactions = await xrplClient.requestAccountTx(address, 200);
+    const userTransactions = await xrplClient.requestAccountTx(address, 50000);
 
     // 自身が送金したトランザクションのみをフィルター（Accountが自分となっているTx）
     const outgoingTransactions = userTransactions.filter((tx: any) => {
       const txJson = tx.tx_json;
       const isOutgoing = txJson.Account === address; // 送信元が自分
 
-      logger.debug('Transaction filtering', {
-        txHash: tx.hash,
-        txAccount: txJson.Account,
-        userAddress: address,
-        isOutgoing: isOutgoing,
-        transactionType: txJson.TransactionType,
-      });
-
       return isOutgoing;
     });
 
-    logger.info('Filtered outgoing transactions', {
-      totalTransactions: userTransactions.length,
-      outgoingTransactions: outgoingTransactions.length,
-      userAddress: address,
-    });
-
     // 送金トランザクションからdepositを検索
-    const depositTx = findTransactionByUuid(
+    const depositTx = await findTransactionByUuid(
       outgoingTransactions,
       deposit.uuid,
       ENCODED_MEMO_TYPE_ID,
@@ -187,6 +173,16 @@ export async function validateTransactionIntegrity(
         uuid: deposit.uuid,
         address,
         reason: `Transaction not found or MemoType is not "${ENCODED_MEMO_TYPE_ID}"`,
+        outgoingTransactionsCount: outgoingTransactions.length,
+        outgoingTransactionsSample: outgoingTransactions.slice(0, 5).map((tx: any) => ({
+          hash: tx.hash,
+          type: tx.tx_json?.TransactionType,
+          memos: tx.tx_json?.Memos?.map((memo: any) => ({
+            memoType: memo.Memo?.MemoType,
+            memoData: memo.Memo?.MemoData?.substring(0, 20) + '...',
+            memoFormat: memo.Memo?.MemoFormat
+          })) || []
+        }))
       });
       throw new Error(
         `Deposit transaction not found or invalid memo structure. MemoType must be "${ENCODED_MEMO_TYPE_ID}".`
@@ -460,79 +456,5 @@ if (tx.meta?.TransactionResult === SUCCESS_RESULT) {
 import { isValidPaymentTransaction } from '@/lib/transaction-validation';
 
 const validTransactions = userTransactions.filter(isValidPaymentTransaction);
-```
-
-### 3. 通貨コードとissuerの検証
-```typescript
-import { validateTokenCurrency } from '@/lib/transaction-validation';
-
-const validation = validateTokenCurrency(currency, issuer, logger);
-if (validation.isValid) {
-  console.log(`Valid token: ${validation.tokenName}`);
-} else {
-  console.error(`Validation failed: ${validation.error}`);
-}
-```
-
-### 4. 通貨情報の抽出
-```typescript
-import { extractAmountInfo } from '@/lib/transaction-validation';
-
-const amountInfo = extractAmountInfo(tx, logger);
-if (amountInfo) {
-  console.log(`Currency: ${amountInfo.currency}, Amount: ${amountInfo.value}`);
-}
-```
-
-## テスト用サンプルデータ
-
-### 成功したトランザクション
-```typescript
-const successfulTx = {
-  meta: {
-    TransactionResult: 'tesSUCCESS'
-  }
-};
-
-console.log(isTransactionSuccessful(successfulTx.meta?.TransactionResult)); // true
-```
-
-### 失敗したトランザクション
-```typescript
-const failedTx = {
-  meta: {
-    TransactionResult: 'tecPATH_DRY'
-  }
-};
-
-console.log(isTransactionSuccessful(failedTx.meta?.TransactionResult)); // false
-```
-
-### 有効なPaymentトランザクション
-```typescript
-const validPaymentTx = {
-  tx_json: {
-    TransactionType: 'Payment'
-  },
-  meta: {
-    TransactionResult: 'tesSUCCESS'
-  }
-};
-
-console.log(isValidPaymentTransaction(validPaymentTx)); // true
-```
-
-### 無効なトランザクション
-```typescript
-const invalidTx = {
-  tx_json: {
-    TransactionType: 'OfferCreate' // Paymentではない
-  },
-  meta: {
-    TransactionResult: 'tesSUCCESS'
-  }
-};
-
-console.log(isValidPaymentTransaction(invalidTx)); // false
 ```
 */

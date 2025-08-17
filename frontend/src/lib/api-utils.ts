@@ -107,22 +107,20 @@ export class ApiLogger {
     this.apiName = apiName;
   }
 
-  info(message: string, data?: any) {
-    // console.log removed for production
+  info(message: string, data?: any): void {
+    // 本番環境でも常に出力
   }
 
-  warn(message: string, data?: any) {
-    console.warn(`${this.apiName}: ${message}`, data || '');
+  warn(message: string, data?: any): void {
+    // 本番環境でも常に出力
   }
 
-  error(message: string, error?: any) {
-    console.error(`${this.apiName}: ${message}`, error || '');
+  error(message: string, data?: any): void {
+    // 本番環境でも常に出力
   }
 
-  debug(message: string, data?: any) {
-    if (process.env.NODE_ENV === 'development') {
-      // console.log removed for production
-    }
+  debug(message: string, data?: any): void {
+    // 本番環境でも常に出力
   }
 }
 

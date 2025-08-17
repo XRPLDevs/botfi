@@ -128,7 +128,15 @@ export async function POST(request: Request) {
 
       // XRPLClientの初期化
       const { XRPLClient } = await import('@/lib/xrplClient');
-      const xrplClient = new XRPLClient(env.XRPL_NODE_URL);
+      const xrplClient = new XRPLClient(); // 環境変数から自動的にネットワークを選択
+      
+      // ネットワーク情報をログ出力
+      const networkInfo = xrplClient.getNetworkInfo();
+      logger.info('XRPL Client initialized', {
+        network: networkInfo.network,
+        endpoint: networkInfo.endpoint,
+        maxHistoryLimit: networkInfo.config.maxHistoryLimit
+      });
 
       for (const deposit of deposits) {
         try {
@@ -174,18 +182,17 @@ export async function POST(request: Request) {
       logger.info('All deposits validated and info extracted', { count: validatedDeposits.length });
 
       // XRPL WalletとClientの初期化
-      const { Wallet, Client } = await import('xrpl');
+      const { Wallet } = await import('xrpl');
       const issuerWallet = Wallet.fromSeed(env.BRLUSD_ISSUER_SEED);
-      const client = new Client(env.XRPL_NODE_URL);
+      // xrplClientは既に初期化済み
 
       logger.info('Processing claim transactions', {
         issuerAddress: issuerWallet.address,
         depositCount: validatedDeposits.length,
       });
 
-      // XRPLクライアントに接続
-      await client.connect();
-      logger.debug('Connected to XRPL network');
+      // XRPLクライアントに接続（xrplClientを使用）
+      logger.debug('Using initialized XRPL client');
 
       const results: Array<{
         uuid: string;
@@ -251,7 +258,7 @@ export async function POST(request: Request) {
             });
 
             // トランザクションの自動補完
-            const autofilledTx = await client.autofill(transaction);
+            const autofilledTx = await xrplClient.autofill(transaction);
             logger.debug('Transaction autofilled');
 
             // トランザクションの署名
@@ -260,7 +267,7 @@ export async function POST(request: Request) {
 
             // 署名済みトランザクションを送信
             logger.info('Submitting signed transaction to XRPL');
-            const result = await client.submit(tx_blob);
+            const result = await xrplClient.submit(tx_blob);
 
             if (isTransactionSuccessful(result.result.engine_result)) {
               logger.info('Transaction submitted successfully', {
@@ -315,7 +322,7 @@ export async function POST(request: Request) {
         }
       } finally {
         // XRPLクライアントの接続を切断
-        await client.disconnect();
+        await xrplClient.disconnect();
         logger.debug('Disconnected from XRPL network');
       }
 
